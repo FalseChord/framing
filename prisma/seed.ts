@@ -16,9 +16,16 @@ async function main() {
     },
   });
 
-  await prisma.therapist.createMany({
-    data: [{ name: "測試心理師A" }, { name: "測試心理師B" }],
-    skipDuplicates: true,
+  await prisma.therapist.upsert({
+    where: { id: "seed-therapist-a" },
+    update: {},
+    create: { id: "seed-therapist-a", name: "測試心理師A" },
+  });
+
+  await prisma.therapist.upsert({
+    where: { id: "seed-therapist-b" },
+    update: {},
+    create: { id: "seed-therapist-b", name: "測試心理師B" },
   });
 
   await prisma.template.upsert({
