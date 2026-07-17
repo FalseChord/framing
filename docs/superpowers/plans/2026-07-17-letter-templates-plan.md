@@ -966,9 +966,11 @@ git commit -m "feat: add templates CRUD API with undeclared-field warning"
 - Create: `src/app/templates/page.tsx`
 
 **Interfaces:**
-- Consumes: `GET/POST /api/templates` from Task 7 (response shape `{ template, undeclaredFields }` on POST).
+- Consumes: `GET/POST/PUT /api/templates` from Task 7 (response shape `{ template, undeclaredFields }` on POST/PUT).
 
 - [ ] **Step 1: Write `src/app/templates/page.tsx`**
+
+Note: the create/edit form includes a "必填欄位" input so the template author explicitly declares which placeholders block letter generation until filled (per spec: without this, every self-service template would silently get `requiredFields: []`, defeating the point of the missing-field check in Task 5/Task 9). The list also has an 編輯 button per template so existing bodies can be updated in place (spec "模板編輯" step 3: "可編輯既有模板內文").
 
 ```tsx
 "use client";
@@ -983,11 +985,19 @@ interface TemplateItem {
   requiredFields: string[];
 }
 
+interface FormState {
+  category: string;
+  variant: string;
+  body: string;
+  requiredFieldsText: string;
+}
+
+const EMPTY_FORM: FormState = { category: "", variant: "一般", body: "", requiredFieldsText: "" };
+
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
-  const [category, setCategory] = useState("");
-  const [variant, setVariant] = useState("一般");
-  const [body, setBody] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [warning, setWarning] = useState<string[]>([]);
 
   async function load() {
@@ -999,17 +1009,42 @@ export default function TemplatesPage() {
     load();
   }, []);
 
-  async function handleCreate(e: React.FormEvent) {
+  function startEdit(t: TemplateItem) {
+    setEditingId(t.id);
+    setForm({
+      category: t.category,
+      variant: t.variant,
+      body: t.body,
+      requiredFieldsText: t.requiredFields.join(", "),
+    });
+    setWarning([]);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setWarning([]);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const res = await fetch("/api/templates", {
-      method: "POST",
+    const requiredFields = form.requiredFieldsText
+      .split(",")
+      .map((f) => f.trim())
+      .filter((f) => f.length > 0);
+
+    const url = editingId ? `/api/templates/${editingId}` : "/api/templates";
+    const method = editingId ? "PUT" : "POST";
+
+    const res = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category, variant, body, requiredFields: [] }),
+      body: JSON.stringify({ category: form.category, variant: form.variant, body: form.body, requiredFields }),
     });
     const data = await res.json();
     setWarning(data.undeclaredFields ?? []);
-    setCategory("");
-    setBody("");
+    setEditingId(null);
+    setForm(EMPTY_FORM);
     await load();
   }
 
@@ -1020,17 +1055,25 @@ export default function TemplatesPage() {
         {templates.map((t) => (
           <li key={t.id}>
             {t.category}（{t.variant}）
+            <button type="button" onClick={() => startEdit(t)}>
+              編輯
+            </button>
           </li>
         ))}
       </ul>
-      <form onSubmit={handleCreate}>
+      <form onSubmit={handleSubmit}>
+        <h2>{editingId ? "編輯模板" : "新增模板"}</h2>
         <label>
           類別
-          <input value={category} onChange={(e) => setCategory(e.target.value)} required />
+          <input
+            value={form.category}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+            required
+          />
         </label>
         <label>
           方案變體
-          <select value={variant} onChange={(e) => setVariant(e.target.value)}>
+          <select value={form.variant} onChange={(e) => setForm({ ...form, variant: e.target.value })}>
             <option value="一般">一般</option>
             <option value="青壯">青壯</option>
             <option value="北捷">北捷</option>
@@ -1039,9 +1082,26 @@ export default function TemplatesPage() {
         </label>
         <label>
           內文
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} required rows={10} />
+          <textarea
+            value={form.body}
+            onChange={(e) => setForm({ ...form, body: e.target.value })}
+            required
+            rows={10}
+          />
         </label>
-        <button type="submit">新增模板</button>
+        <label>
+          必填欄位（用逗號分隔，例如：caseRef, therapistName, sessionDate）
+          <input
+            value={form.requiredFieldsText}
+            onChange={(e) => setForm({ ...form, requiredFieldsText: e.target.value })}
+          />
+        </label>
+        <button type="submit">{editingId ? "儲存修改" : "新增模板"}</button>
+        {editingId && (
+          <button type="button" onClick={cancelEdit}>
+            取消編輯
+          </button>
+        )}
       </form>
       {warning.length > 0 && (
         <p role="alert">
@@ -1055,7 +1115,13 @@ export default function TemplatesPage() {
 
 - [ ] **Step 2: Manual verification**
 
-Run: `npm run dev &`, wait a few seconds. In a browser, log in at `http://localhost:3000/login` with `test.admin@example.com` / `test-password-123`, then open `http://localhost:3000/templates`. Confirm the seeded "媒合信（一般）" appears in the list. Add a new template with a typo'd field (e.g. body containing `{{oopsField}}`) and confirm the warning message appears listing `oopsField`. Reload the page and confirm the new template now appears in the list.
+Run: `npm run dev &`, wait a few seconds. In a browser, log in at `http://localhost:3000/login` with `test.admin@example.com` / `test-password-123`, then open `http://localhost:3000/templates`. Confirm the seeded "媒合信（一般）" appears in the list.
+
+Add a new template: 類別 `候補信`, 方案變體 `一般`, 內文 containing `{{caseRef}} {{groupName}}`, 必填欄位 `caseRef, groupName`. Confirm no warning appears (both fields declared) and the new template appears in the list.
+
+Click 編輯 on that new template, add `{{oopsField}}` to the body, and save. Confirm the warning message appears listing `oopsField`.
+
+Reload the page and confirm the edited body persisted (not lost).
 
 Stop the dev server.
 
@@ -1185,6 +1251,8 @@ export async function POST(request: NextRequest) {
 
 - [ ] **Step 6: Write `src/app/generate/page.tsx`**
 
+Note: the field inputs are generated dynamically from `template.requiredFields`, not hardcoded to `caseRef`/`therapistName`/`sessionDate`. A self-service template can declare any required field name (e.g. `groupName` for the 候補信 template added in Task 8's verification step); hardcoding the three known fields would leave no way to fill in anything else, silently breaking every template beyond the seeded one. `therapistName` and `sessionDate` get a dropdown/date-picker widget when they appear; any other field name falls back to a plain text input labeled with its raw name.
+
 ```tsx
 "use client";
 
@@ -1207,9 +1275,7 @@ export default function GeneratePage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [templateId, setTemplateId] = useState("");
-  const [caseRef, setCaseRef] = useState("");
-  const [therapistName, setTherapistName] = useState("");
-  const [sessionDate, setSessionDate] = useState("");
+  const [fields, setFields] = useState<Record<string, string>>({});
   const [recipientEmail, setRecipientEmail] = useState("");
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
@@ -1219,19 +1285,30 @@ export default function GeneratePage() {
     fetch("/api/therapists").then((r) => r.json()).then(setTherapists);
   }, []);
 
+  const selectedTemplate = templates.find((t) => t.id === templateId);
+
+  function handleTemplateChange(id: string) {
+    setTemplateId(id);
+    setFields({});
+    setResult("");
+  }
+
+  function setField(name: string, value: string) {
+    setFields((prev) => ({ ...prev, [name]: value }));
+  }
+
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    const template = templates.find((t) => t.id === templateId);
-    if (!template) return;
+    if (!selectedTemplate) return;
 
     const res = await fetch("/api/letters/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         templateId,
-        variant: template.variant,
-        fields: { caseRef, therapistName, sessionDate },
+        variant: selectedTemplate.variant,
+        fields,
       }),
     });
 
@@ -1244,10 +1321,9 @@ export default function GeneratePage() {
   }
 
   function openGmailDraft() {
-    const template = templates.find((t) => t.id === templateId);
     const url = buildGmailComposeUrl({
       to: recipientEmail,
-      subject: template?.category ?? "",
+      subject: selectedTemplate?.category ?? "",
       body: result,
     });
     window.open(url, "_blank");
@@ -1259,7 +1335,7 @@ export default function GeneratePage() {
       <form onSubmit={handleGenerate}>
         <label>
           信件模板
-          <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} required>
+          <select value={templateId} onChange={(e) => handleTemplateChange(e.target.value)} required>
             <option value="">請選擇</option>
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
@@ -1268,25 +1344,64 @@ export default function GeneratePage() {
             ))}
           </select>
         </label>
-        <label>
-          心理師
-          <select value={therapistName} onChange={(e) => setTherapistName(e.target.value)} required>
-            <option value="">請選擇</option>
-            {therapists.map((t) => (
-              <option key={t.id} value={t.name}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          日期
-          <input type="date" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} required />
-        </label>
-        <label>
-          個案代號
-          <input value={caseRef} onChange={(e) => setCaseRef(e.target.value)} required />
-        </label>
+
+        {selectedTemplate?.requiredFields.map((fieldName) => {
+          if (fieldName === "therapistName") {
+            return (
+              <label key={fieldName}>
+                心理師
+                <select
+                  value={fields.therapistName ?? ""}
+                  onChange={(e) => setField("therapistName", e.target.value)}
+                  required
+                >
+                  <option value="">請選擇</option>
+                  {therapists.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            );
+          }
+          if (fieldName === "sessionDate") {
+            return (
+              <label key={fieldName}>
+                日期
+                <input
+                  type="date"
+                  value={fields.sessionDate ?? ""}
+                  onChange={(e) => setField("sessionDate", e.target.value)}
+                  required
+                />
+              </label>
+            );
+          }
+          if (fieldName === "caseRef") {
+            return (
+              <label key={fieldName}>
+                個案代號
+                <input
+                  value={fields.caseRef ?? ""}
+                  onChange={(e) => setField("caseRef", e.target.value)}
+                  required
+                />
+              </label>
+            );
+          }
+          return (
+            <label key={fieldName}>
+              {fieldName}
+              <input
+                value={fields[fieldName] ?? ""}
+                onChange={(e) => setField(fieldName, e.target.value)}
+                required
+              />
+            </label>
+          );
+        })}
+
         <label>
           收件者 Email（僅本次使用，不會被儲存）
           <input
@@ -1297,7 +1412,9 @@ export default function GeneratePage() {
           />
         </label>
         {error && <p role="alert">{error}</p>}
-        <button type="submit">產生信件</button>
+        <button type="submit" disabled={!templateId}>
+          產生信件
+        </button>
       </form>
       {result && (
         <section>
@@ -1313,7 +1430,9 @@ export default function GeneratePage() {
 
 - [ ] **Step 7: Manual end-to-end verification**
 
-Run: `npm run dev &`, wait a few seconds. In a browser: log in, open `http://localhost:3000/generate`, select the seeded "媒合信（一般）" template, pick a therapist, pick a date, type a case reference (e.g. `A001`) and a recipient email (e.g. `test@example.com`), click 產生信件. Confirm the rendered text shows the substituted values and the "一般" (non-EAP) branch text. Click 開啟 Gmail 草稿 and confirm a new tab opens to `mail.google.com` with the compose window pre-filled.
+Run: `npm run dev &`, wait a few seconds. In a browser: log in, open `http://localhost:3000/generate`, select the seeded "媒合信（一般）" template. Confirm the 心理師 dropdown, 日期 picker, and 個案代號 text box all appear (from `requiredFields`), pick a therapist, pick a date, type a case reference (e.g. `A001`) and a recipient email (e.g. `test@example.com`), click 產生信件. Confirm the rendered text shows the substituted values and the "一般" (non-EAP) branch text. Click 開啟 Gmail 草稿 and confirm a new tab opens to `mail.google.com` with the compose window pre-filled.
+
+Then select the "候補信（一般）" template added during Task 8's verification (`requiredFields: caseRef, groupName`). Confirm the form now shows a 個案代號 box and a plain `groupName` text box (not a 心理師 dropdown or date picker, since that template didn't declare those fields), fill both in, and confirm generation succeeds.
 
 Then confirm the audit log wrote a row without any case data:
 ```bash
@@ -1336,9 +1455,10 @@ git commit -m "feat: add letter generation UI with Gmail draft prefill and audit
 
 **Files:**
 - Create: `docs/WINDOWS_SETUP.md`
+- Create: `scripts/backup-db.bat`
 
 **Interfaces:**
-- None (documentation only). References env var names from Task 1 (`.env.example`) and seed credentials from Task 2 (`prisma/seed.ts`) — must stay in sync if either changes later.
+- None (documentation only). References env var names from Task 1 (`.env.example`) and seed credentials from Task 2 (`prisma/seed.ts`) — must stay in sync if either changes later. Also implements the spec's "備份：每晚 pg_dump 至本機，再由人工定期複製到外接硬碟" commitment, which no earlier task covers.
 
 - [ ] **Step 1: Write `docs/WINDOWS_SETUP.md`**
 
@@ -1380,6 +1500,21 @@ npm start
 ```
 接著開啟瀏覽器，輸入 `http://localhost:3000` 即可使用。不使用時可以直接關閉命令提示字元視窗結束程式。
 
+## 資料庫備份設定
+
+**一次性設定：**
+
+1. 用記事本開啟 `scripts\backup-db.bat`，把 `YOUR_POSTGRES_PASSWORD_HERE` 換成你在「一次性安裝」步驟 2 設定的 postgres 密碼，存檔。
+2. 開啟「工作排程器」（Task Scheduler，開始選單搜尋即可找到）→ 建立基本工作。
+3. 名稱填 `framing 資料庫備份`，觸發程序選「每天」，時間選一個深夜、電腦通常還開著的時段（例如 23:30）。
+4. 動作選「啟動程式」，程式路徑填該 `.bat` 檔的完整路徑（例如 `C:\framing\scripts\backup-db.bat`）。
+5. 完成後在工作排程器裡對這個工作按右鍵「執行」，確認 `C:\framing\backups\` 資料夾內出現一個新的 `.dump` 檔案。
+
+**每週人工作業：**
+
+- 定期（建議每週）將 `backups` 資料夾內最新的備份檔複製到外接硬碟，並將硬碟異地存放（例如帶回家、保險箱），避免主機單一硬體故障造成資料全失。
+- 外接硬碟上的舊檔案可視空間酌量刪除，只需保留近期幾份。
+
 ## 目前刻意不做的事
 
 - 沒有設定成開機自動啟動的背景服務（Windows 服務），需要每次手動執行上面的啟動指令
@@ -1389,13 +1524,27 @@ npm start
 這些都是本階段刻意的取捨（見 `docs/superpowers/specs/2026-07-16-letter-templates-design.md`），如果之後要讓其他人連線使用，需要回頭處理。
 ```
 
-- [ ] **Step 2: Verify consistency**
+- [ ] **Step 2: Write `scripts/backup-db.bat`**
 
-Re-read `.env.example` (Task 1) and `prisma/seed.ts` (Task 2), confirm the env var names and seed credentials quoted in `docs/WINDOWS_SETUP.md` match exactly.
+Note: `pg_dump.exe`'s path assumes the default PostgreSQL 16 Windows install location; if the installer used a different version/path, the admin following `docs/WINDOWS_SETUP.md` needs to adjust this one line. The password placeholder is filled in directly by the admin during one-time setup (see `docs/WINDOWS_SETUP.md`'s 資料庫備份設定 step 1) rather than via an OS environment variable, consistent with how `.env` is already hand-edited elsewhere in this doc.
 
-- [ ] **Step 3: Commit**
+```bat
+@echo off
+setlocal
+set BACKUP_DIR=%~dp0..\backups
+if not exist "%BACKUP_DIR%" mkdir "%BACKUP_DIR%"
+set TIMESTAMP=%date:~0,4%%date:~5,2%%date:~8,2%
+set PGPASSWORD=YOUR_POSTGRES_PASSWORD_HERE
+"C:\Program Files\PostgreSQL\16\bin\pg_dump.exe" -U postgres -F c -f "%BACKUP_DIR%\framing_%TIMESTAMP%.dump" framing
+```
+
+- [ ] **Step 3: Verify consistency**
+
+Re-read `.env.example` (Task 1) and `prisma/seed.ts` (Task 2), confirm the env var names and seed credentials quoted in `docs/WINDOWS_SETUP.md` match exactly. Confirm `scripts/backup-db.bat`'s database name (`framing`) matches the one used in `docs/WINDOWS_SETUP.md`'s installation steps.
+
+- [ ] **Step 4: Commit**
 
 ```bash
-git add docs/WINDOWS_SETUP.md
-git commit -m "docs: add Windows deployment instructions"
+git add docs/WINDOWS_SETUP.md scripts/backup-db.bat
+git commit -m "docs: add Windows deployment instructions and nightly backup script"
 ```
