@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(uuid())
+  email        String      @unique
+  passwordHash String
+  signature    String
+  createdAt    DateTime    @default(now())
+  templates    Template[]
+  letters      LetterLog[]
+
+  @@map("users")
+}
+
+model Therapist {
+  id       String  @id @default(uuid())
+  name     String
+  isActive Boolean @default(true)
+
+  @@map("therapists")
+}
+
+model Template {
+  id             String      @id @default(uuid())
+  category       String
+  variant        String
+  body           String
+  requiredFields String[]    @default([])
+  updatedAt      DateTime    @updatedAt
+  updatedById    String
+  updatedBy      User        @relation(fields: [updatedById], references: [id])
+  letters        LetterLog[]
+
+  @@map("templates")
+}
+
+model LetterLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  templateId  String
+  template    Template @relation(fields: [templateId], references: [id])
+  generatedAt DateTime @default(now())
+
+  @@map("letters_log")
+}

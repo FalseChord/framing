@@ -1,0 +1,51 @@
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
+
+const prisma = new PrismaClient();
+
+async function main() {
+  const passwordHash = await bcrypt.hash("test-password-123", 10);
+
+  const user = await prisma.user.upsert({
+    where: { email: "test.admin@example.com" },
+    update: {},
+    create: {
+      email: "test.admin@example.com",
+      passwordHash,
+      signature: "TA",
+    },
+  });
+
+  await prisma.therapist.createMany({
+    data: [{ name: "測試心理師A" }, { name: "測試心理師B" }],
+    skipDuplicates: true,
+  });
+
+  await prisma.template.upsert({
+    where: { id: "seed-template-matching" },
+    update: {},
+    create: {
+      id: "seed-template-matching",
+      category: "媒合信",
+      variant: "一般",
+      body:
+        "親愛的 {{caseRef}} 您好：\n\n" +
+        "很高興通知您，已為您媒合心理師 {{therapistName}}，" +
+        "首次晤談時間為 {{sessionDate}}。\n\n" +
+        '{{#if (eq variant "EAP")}}本次服務由貴公司 EAP 方案支付費用。{{else}}期待與您見面。{{/if}}',
+      requiredFields: ["caseRef", "therapistName", "sessionDate"],
+      updatedById: user.id,
+    },
+  });
+
+  console.log("Seed complete (synthetic data only).");
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
