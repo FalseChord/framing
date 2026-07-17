@@ -3,18 +3,17 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id           String      @id @default(uuid())
-  email        String      @unique
-  passwordHash String
-  signature    String
-  createdAt    DateTime    @default(now())
-  templates    Template[]
-  letters      LetterLog[]
+  id        String      @id @default(uuid())
+  name      String
+  signature String
+  createdAt DateTime    @default(now())
+  templates Template[]
+  letters   LetterLog[]
 
   @@map("users")
 }
@@ -32,7 +31,7 @@ model Template {
   category       String
   variant        String
   body           String
-  requiredFields String[]    @default([])
+  requiredFields String      @default("[]")
   updatedAt      DateTime    @updatedAt
   updatedById    String
   updatedBy      User        @relation(fields: [updatedById], references: [id])

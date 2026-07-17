@@ -1,17 +1,14 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const passwordHash = await bcrypt.hash("test-password-123", 10);
-
   const user = await prisma.user.upsert({
-    where: { email: "test.admin@example.com" },
+    where: { id: "seed-user-admin" },
     update: {},
     create: {
-      email: "test.admin@example.com",
-      passwordHash,
+      id: "seed-user-admin",
+      name: "測試人員",
       signature: "TA",
     },
   });
@@ -21,7 +18,6 @@ async function main() {
     update: {},
     create: { id: "seed-therapist-a", name: "測試心理師A" },
   });
-
   await prisma.therapist.upsert({
     where: { id: "seed-therapist-b" },
     update: {},
@@ -40,7 +36,7 @@ async function main() {
         "很高興通知您，已為您媒合心理師 {{therapistName}}，" +
         "首次晤談時間為 {{sessionDate}}。\n\n" +
         '{{#if (eq variant "EAP")}}本次服務由貴公司 EAP 方案支付費用。{{else}}期待與您見面。{{/if}}',
-      requiredFields: ["caseRef", "therapistName", "sessionDate"],
+      requiredFields: JSON.stringify(["caseRef", "therapistName", "sessionDate"]),
       updatedById: user.id,
     },
   });
