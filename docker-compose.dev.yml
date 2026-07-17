@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: framing
+      POSTGRES_PASSWORD: framing_dev_password
+      POSTGRES_DB: framing
+    ports:
+      - "5432:5432"
+    volumes:
+      - framing_pg_data:/var/lib/postgresql/data
+
+volumes:
+  framing_pg_data:
