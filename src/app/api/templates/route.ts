@@ -7,7 +7,11 @@ import { encodeRequiredFields, decodeRequiredFields } from "@/lib/letters/requir
 const prisma = new PrismaClient();
 
 function serializeTemplate(template: Template) {
-  return { ...template, requiredFields: decodeRequiredFields(template.requiredFields) };
+  return {
+    ...template,
+    requiredFields: decodeRequiredFields(template.requiredFields),
+    variants: decodeRequiredFields(template.variants),
+  };
 }
 
 export async function GET() {
@@ -21,22 +25,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "尚未選擇操作者" }, { status: 401 });
   }
 
-  const { category, variant, body, requiredFields } = await request.json();
-  if (!category || !variant || !body) {
-    return NextResponse.json({ error: "類別、方案變體、內文為必填" }, { status: 400 });
+  const { category, subject, body, variants, requiredFields } = await request.json();
+  if (!category || !subject || !body) {
+    return NextResponse.json({ error: "類別、標題、內文為必填" }, { status: 400 });
   }
 
   const declaredFields: string[] = requiredFields ?? [];
+  const declaredVariants: string[] = variants && variants.length > 0 ? variants : ["不適用"];
+
   const template = await prisma.template.create({
     data: {
       category,
-      variant,
+      subject,
       body,
+      variants: encodeRequiredFields(declaredVariants),
       requiredFields: encodeRequiredFields(declaredFields),
       updatedById: session.userId,
     },
   });
 
-  const undeclaredFields = findUndeclaredFields(body, declaredFields);
+  const undeclaredFields = findUndeclaredFields(`${subject}\n${body}`, declaredFields);
   return NextResponse.json({ template: serializeTemplate(template), undeclaredFields }, { status: 201 });
 }
