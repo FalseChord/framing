@@ -22,6 +22,8 @@ model Therapist {
   id       String  @id @default(uuid())
   name     String
   isActive Boolean @default(true)
+  email    String?
+  note     String?
 
   @@map("therapists")
 }
@@ -29,8 +31,9 @@ model Therapist {
 model Template {
   id             String      @id @default(uuid())
   category       String
-  variant        String
+  subject        String
   body           String
+  variants       String      @default("[\"不適用\"]")
   requiredFields String      @default("[]")
   updatedAt      DateTime    @updatedAt
   updatedById    String
