@@ -19,6 +19,7 @@ export default function GeneratePage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [templateId, setTemplateId] = useState("");
+  const [variant, setVariant] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [recipientEmail, setRecipientEmail] = useState("");
   const [result, setResult] = useState("");
@@ -33,6 +34,8 @@ export default function GeneratePage() {
 
   function handleTemplateChange(id: string) {
     setTemplateId(id);
+    const template = templates.find((t) => t.id === id);
+    setVariant(template?.variant ?? "");
     setFields({});
     setResult("");
   }
@@ -51,7 +54,7 @@ export default function GeneratePage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         templateId,
-        variant: selectedTemplate.variant,
+        variant,
         fields,
       }),
     });
@@ -86,6 +89,17 @@ export default function GeneratePage() {
                 {t.category}（{t.variant}）
               </option>
             ))}
+          </select>
+        </label>
+
+        <label>
+          方案變體
+          <select value={variant} onChange={(e) => setVariant(e.target.value)} required>
+            <option value="一般">一般</option>
+            <option value="青壯">青壯</option>
+            <option value="北捷">北捷</option>
+            <option value="EAP">EAP</option>
+            <option value="不適用">不適用</option>
           </select>
         </label>
 
