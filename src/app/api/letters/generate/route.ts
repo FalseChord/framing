@@ -3,29 +3,30 @@ import { PrismaClient } from "@prisma/client";
 import { getSession } from "@/lib/auth/session";
 import { renderLetter, MissingFieldsError } from "@/lib/letters/render";
 import { decodeRequiredFields } from "@/lib/letters/requiredFields";
+import { toHighlightedHtml, stripHighlightMarkers } from "@/lib/letters/highlightMarkup";
+import { buildSignatureBlock } from "@/lib/letters/signature";
 
 const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
-  if (!session.userId) {
+  if (!session.userId || !session.signature) {
     return NextResponse.json({ error: "尚未選擇操作者" }, { status: 401 });
   }
 
-  const { templateId, fields, variant } = await request.json();
+  const { templateId, fields, variant, slotCount, includeLine } = await request.json();
   const template = await prisma.template.findUnique({ where: { id: templateId } });
   if (!template) {
     return NextResponse.json({ error: "找不到模板" }, { status: 404 });
   }
 
+  const requiredFields = decodeRequiredFields(template.requiredFields);
+
+  let renderedSubject: string;
   let renderedBody: string;
   try {
-    renderedBody = renderLetter({
-      templateBody: template.body,
-      requiredFields: decodeRequiredFields(template.requiredFields),
-      fields,
-      variant,
-    });
+    renderedSubject = renderLetter({ templateBody: template.subject, requiredFields, fields, variant, slotCount });
+    renderedBody = renderLetter({ templateBody: template.body, requiredFields, fields, variant, slotCount });
   } catch (err) {
     if (err instanceof MissingFieldsError) {
       return NextResponse.json({ error: err.message, missingFields: err.missingFields }, { status: 400 });
@@ -33,10 +34,20 @@ export async function POST(request: NextRequest) {
     throw err;
   }
 
+  const signatureBlock = buildSignatureBlock({
+    operatorSignature: session.signature,
+    includeLine: Boolean(includeLine),
+  });
+  const fullBody = `${renderedBody}\n\n${signatureBlock}`;
+
   // Audit log intentionally excludes caseRef, recipient email, and the rendered body itself.
   await prisma.letterLog.create({
     data: { userId: session.userId, templateId: template.id },
   });
 
-  return NextResponse.json({ renderedBody });
+  return NextResponse.json({
+    renderedSubject: stripHighlightMarkers(renderedSubject),
+    renderedBodyHtml: toHighlightedHtml(fullBody),
+    renderedBodyPlain: stripHighlightMarkers(fullBody),
+  });
 }
