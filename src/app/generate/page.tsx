@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { buildGmailComposeUrl } from "@/lib/letters/gmailUrl";
+import { formatSessionSlot, formatSessionSlots, type SessionSlotInput } from "@/lib/letters/dateFormat";
 
 interface TemplateItem {
   id: string;
   category: string;
-  variant: string;
+  subject: string;
+  variants: string[];
   requiredFields: string[];
 }
 
@@ -15,14 +17,20 @@ interface Therapist {
   name: string;
 }
 
+const EMPTY_SLOT: SessionSlotInput = { date: "", startTime: "", endTime: "" };
+
 export default function GeneratePage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [templateId, setTemplateId] = useState("");
   const [variant, setVariant] = useState("");
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const [recipientEmail, setRecipientEmail] = useState("");
-  const [result, setResult] = useState("");
+  const [textFields, setTextFields] = useState<Record<string, string>>({});
+  const [sessionDateValue, setSessionDateValue] = useState<SessionSlotInput>(EMPTY_SLOT);
+  const [sessionSlotValues, setSessionSlotValues] = useState<SessionSlotInput[]>([EMPTY_SLOT]);
+  const [toEmails, setToEmails] = useState<string[]>([""]);
+  const [bccEmails, setBccEmails] = useState<string[]>([""]);
+  const [includeLine, setIncludeLine] = useState(false);
+  const [result, setResult] = useState<{ subject: string; html: string; plain: string } | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -31,17 +39,29 @@ export default function GeneratePage() {
   }, []);
 
   const selectedTemplate = templates.find((t) => t.id === templateId);
+  const showVariantPicker = (selectedTemplate?.variants.length ?? 0) > 1;
 
   function handleTemplateChange(id: string) {
     setTemplateId(id);
-    const template = templates.find((t) => t.id === id);
-    setVariant(template?.variant ?? "");
-    setFields({});
-    setResult("");
+    const t = templates.find((item) => item.id === id);
+    setVariant(t?.variants[0] ?? "");
+    setTextFields({});
+    setSessionDateValue(EMPTY_SLOT);
+    setSessionSlotValues([EMPTY_SLOT]);
+    setResult(null);
+    setError("");
   }
 
-  function setField(name: string, value: string) {
-    setFields((prev) => ({ ...prev, [name]: value }));
+  function setTextField(name: string, value: string) {
+    setTextFields((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function updateSlot(index: number, patch: Partial<SessionSlotInput>) {
+    setSessionSlotValues((prev) => prev.map((slot, i) => (i === index ? { ...slot, ...patch } : slot)));
+  }
+
+  function updateEmailList(list: string[], setList: (v: string[]) => void, index: number, value: string) {
+    setList(list.map((email, i) => (i === index ? value : email)));
   }
 
   async function handleGenerate(e: React.FormEvent) {
@@ -49,14 +69,23 @@ export default function GeneratePage() {
     setError("");
     if (!selectedTemplate) return;
 
+    const fields: Record<string, string> = { ...textFields };
+    let slotCount: number | undefined;
+
+    if (selectedTemplate.requiredFields.includes("sessionDate")) {
+      fields.sessionDate = sessionDateValue.date ? formatSessionSlot(sessionDateValue) : "";
+    }
+    if (selectedTemplate.requiredFields.includes("sessionSlots")) {
+      const filledSlots = sessionSlotValues.filter((slot) => slot.date);
+      const formatted = formatSessionSlots(filledSlots);
+      fields.sessionSlots = formatted.text;
+      slotCount = formatted.count;
+    }
+
     const res = await fetch("/api/letters/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        templateId,
-        variant,
-        fields,
-      }),
+      body: JSON.stringify({ templateId, variant, fields, slotCount, includeLine }),
     });
 
     const data = await res.json();
@@ -64,14 +93,19 @@ export default function GeneratePage() {
       setError(data.error);
       return;
     }
-    setResult(data.renderedBody);
+    setResult({ subject: data.renderedSubject, html: data.renderedBodyHtml, plain: data.renderedBodyPlain });
   }
 
-  function openGmailDraft() {
+  async function handleCopyAndOpenGmail() {
+    if (!result) return;
+    const htmlBlob = new Blob([result.html], { type: "text/html" });
+    const textBlob = new Blob([result.plain], { type: "text/plain" });
+    await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })]);
+
     const url = buildGmailComposeUrl({
-      to: recipientEmail,
-      subject: selectedTemplate?.category ?? "",
-      body: result,
+      to: toEmails.filter((e) => e.trim()).join(","),
+      bcc: bccEmails.filter((e) => e.trim()).join(","),
+      subject: result.subject,
     });
     window.open(url, "_blank");
   }
@@ -86,22 +120,24 @@ export default function GeneratePage() {
             <option value="">請選擇</option>
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.category}（{t.variant}）
+                {t.category}
               </option>
             ))}
           </select>
         </label>
 
-        <label>
-          方案變體
-          <select value={variant} onChange={(e) => setVariant(e.target.value)} required>
-            <option value="一般">一般</option>
-            <option value="青壯">青壯</option>
-            <option value="北捷">北捷</option>
-            <option value="EAP">EAP</option>
-            <option value="不適用">不適用</option>
-          </select>
-        </label>
+        {showVariantPicker && selectedTemplate && (
+          <label>
+            方案
+            <select value={variant} onChange={(e) => setVariant(e.target.value)} required>
+              {selectedTemplate.variants.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {selectedTemplate?.requiredFields.map((fieldName) => {
           if (fieldName === "therapistName") {
@@ -109,8 +145,8 @@ export default function GeneratePage() {
               <label key={fieldName}>
                 心理師
                 <select
-                  value={fields.therapistName ?? ""}
-                  onChange={(e) => setField("therapistName", e.target.value)}
+                  value={textFields.therapistName ?? ""}
+                  onChange={(e) => setTextField("therapistName", e.target.value)}
                   required
                 >
                   <option value="">請選擇</option>
@@ -125,50 +161,123 @@ export default function GeneratePage() {
           }
           if (fieldName === "sessionDate") {
             return (
-              <label key={fieldName}>
-                日期
+              <fieldset key={fieldName}>
+                <legend>日期時段</legend>
                 <input
                   type="date"
-                  value={fields.sessionDate ?? ""}
-                  onChange={(e) => setField("sessionDate", e.target.value)}
+                  value={sessionDateValue.date}
+                  onChange={(e) => setSessionDateValue({ ...sessionDateValue, date: e.target.value })}
                   required
                 />
-              </label>
+                <input
+                  type="time"
+                  value={sessionDateValue.startTime}
+                  onChange={(e) => setSessionDateValue({ ...sessionDateValue, startTime: e.target.value })}
+                  required
+                />
+                至
+                <input
+                  type="time"
+                  value={sessionDateValue.endTime}
+                  onChange={(e) => setSessionDateValue({ ...sessionDateValue, endTime: e.target.value })}
+                  required
+                />
+              </fieldset>
+            );
+          }
+          if (fieldName === "sessionSlots") {
+            return (
+              <fieldset key={fieldName}>
+                <legend>候選時段（可新增多筆）</legend>
+                {sessionSlotValues.map((slot, index) => (
+                  <div key={index}>
+                    <input type="date" value={slot.date} onChange={(e) => updateSlot(index, { date: e.target.value })} />
+                    <input
+                      type="time"
+                      value={slot.startTime}
+                      onChange={(e) => updateSlot(index, { startTime: e.target.value })}
+                    />
+                    至
+                    <input
+                      type="time"
+                      value={slot.endTime}
+                      onChange={(e) => updateSlot(index, { endTime: e.target.value })}
+                    />
+                    {sessionSlotValues.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setSessionSlotValues(sessionSlotValues.filter((_, i) => i !== index))}
+                      >
+                        刪除
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button type="button" onClick={() => setSessionSlotValues([...sessionSlotValues, EMPTY_SLOT])}>
+                  新增時段
+                </button>
+              </fieldset>
             );
           }
           if (fieldName === "caseRef") {
             return (
               <label key={fieldName}>
                 個案代號
-                <input
-                  value={fields.caseRef ?? ""}
-                  onChange={(e) => setField("caseRef", e.target.value)}
-                  required
-                />
+                <input value={textFields.caseRef ?? ""} onChange={(e) => setTextField("caseRef", e.target.value)} required />
               </label>
             );
           }
           return (
             <label key={fieldName}>
               {fieldName}
-              <input
-                value={fields[fieldName] ?? ""}
-                onChange={(e) => setField(fieldName, e.target.value)}
-                required
-              />
+              <input value={textFields[fieldName] ?? ""} onChange={(e) => setTextField(fieldName, e.target.value)} required />
             </label>
           );
         })}
 
+        <fieldset>
+          <legend>收件者（選填，可新增多筆）</legend>
+          {toEmails.map((email, index) => (
+            <div key={index}>
+              <input type="email" value={email} onChange={(e) => updateEmailList(toEmails, setToEmails, index, e.target.value)} />
+              {toEmails.length > 1 && (
+                <button type="button" onClick={() => setToEmails(toEmails.filter((_, i) => i !== index))}>
+                  刪除
+                </button>
+              )}
+            </div>
+          ))}
+          <button type="button" onClick={() => setToEmails([...toEmails, ""])}>
+            新增收件者
+          </button>
+        </fieldset>
+
+        <fieldset>
+          <legend>密件副本 BCC（選填，可新增多筆）</legend>
+          {bccEmails.map((email, index) => (
+            <div key={index}>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => updateEmailList(bccEmails, setBccEmails, index, e.target.value)}
+              />
+              {bccEmails.length > 1 && (
+                <button type="button" onClick={() => setBccEmails(bccEmails.filter((_, i) => i !== index))}>
+                  刪除
+                </button>
+              )}
+            </div>
+          ))}
+          <button type="button" onClick={() => setBccEmails([...bccEmails, ""])}>
+            新增密件副本
+          </button>
+        </fieldset>
+
         <label>
-          收件者 Email（僅本次使用，不會被儲存）
-          <input
-            type="email"
-            value={recipientEmail}
-            onChange={(e) => setRecipientEmail(e.target.value)}
-            required
-          />
+          <input type="checkbox" checked={includeLine} onChange={(e) => setIncludeLine(e.target.checked)} />
+          附加官方 LINE 聯繫方式
         </label>
+
         {error && <p role="alert">{error}</p>}
         <button type="submit" disabled={!templateId}>
           產生信件
@@ -177,8 +286,9 @@ export default function GeneratePage() {
       {result && (
         <section>
           <h2>產出結果</h2>
-          <pre>{result}</pre>
-          <button onClick={openGmailDraft}>開啟 Gmail 草稿</button>
+          <p>主旨：{result.subject}</p>
+          <div dangerouslySetInnerHTML={{ __html: result.html }} />
+          <button onClick={handleCopyAndOpenGmail}>複製格式化內文並開啟 Gmail 草稿</button>
         </section>
       )}
     </main>
