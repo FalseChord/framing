@@ -191,17 +191,19 @@ export default function GeneratePage() {
                 <legend>候選時段（可新增多筆）</legend>
                 {sessionSlotValues.map((slot, index) => (
                   <div key={index}>
-                    <input type="date" value={slot.date} onChange={(e) => updateSlot(index, { date: e.target.value })} />
+                    <input type="date" value={slot.date} onChange={(e) => updateSlot(index, { date: e.target.value })} required />
                     <input
                       type="time"
                       value={slot.startTime}
                       onChange={(e) => updateSlot(index, { startTime: e.target.value })}
+                      required
                     />
                     至
                     <input
                       type="time"
                       value={slot.endTime}
                       onChange={(e) => updateSlot(index, { endTime: e.target.value })}
+                      required
                     />
                     {sessionSlotValues.length > 1 && (
                       <button
