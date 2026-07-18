@@ -5,19 +5,21 @@ import { useEffect, useState } from "react";
 interface TemplateItem {
   id: string;
   category: string;
-  variant: string;
+  subject: string;
   body: string;
+  variants: string[];
   requiredFields: string[];
 }
 
 interface FormState {
   category: string;
-  variant: string;
+  subject: string;
   body: string;
+  variantsText: string;
   requiredFieldsText: string;
 }
 
-const EMPTY_FORM: FormState = { category: "", variant: "一般", body: "", requiredFieldsText: "" };
+const EMPTY_FORM: FormState = { category: "", subject: "", body: "", variantsText: "不適用", requiredFieldsText: "" };
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
@@ -38,8 +40,9 @@ export default function TemplatesPage() {
     setEditingId(t.id);
     setForm({
       category: t.category,
-      variant: t.variant,
+      subject: t.subject,
       body: t.body,
+      variantsText: t.variants.join(", "),
       requiredFieldsText: t.requiredFields.join(", "),
     });
     setWarning([]);
@@ -53,6 +56,10 @@ export default function TemplatesPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const variants = form.variantsText
+      .split(",")
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0);
     const requiredFields = form.requiredFieldsText
       .split(",")
       .map((f) => f.trim())
@@ -64,7 +71,7 @@ export default function TemplatesPage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category: form.category, variant: form.variant, body: form.body, requiredFields }),
+      body: JSON.stringify({ category: form.category, subject: form.subject, body: form.body, variants, requiredFields }),
     });
     const data = await res.json();
     setWarning(data.undeclaredFields ?? []);
@@ -79,7 +86,7 @@ export default function TemplatesPage() {
       <ul>
         {templates.map((t) => (
           <li key={t.id}>
-            {t.category}（{t.variant}）
+            {t.category}（{t.variants.join("、")}）
             <button type="button" onClick={() => startEdit(t)}>
               編輯
             </button>
@@ -90,31 +97,33 @@ export default function TemplatesPage() {
         <h2>{editingId ? "編輯模板" : "新增模板"}</h2>
         <label>
           類別
+          <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required />
+        </label>
+        <label>
+          適用方案（用逗號分隔，例如：一般, 伴侶, 青壯；沒有方案差異就填「不適用」）
           <input
-            value={form.category}
-            onChange={(e) => setForm({ ...form, category: e.target.value })}
+            value={form.variantsText}
+            onChange={(e) => setForm({ ...form, variantsText: e.target.value })}
             required
           />
         </label>
         <label>
-          方案變體
-          <select value={form.variant} onChange={(e) => setForm({ ...form, variant: e.target.value })}>
-            <option value="一般">一般</option>
-            <option value="青壯">青壯</option>
-            <option value="北捷">北捷</option>
-            <option value="EAP">EAP</option>
-            <option value="不適用">不適用</option>
-          </select>
+          標題
+          <input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} required />
         </label>
         <label>
           內文
-          <textarea
-            value={form.body}
-            onChange={(e) => setForm({ ...form, body: e.target.value })}
-            required
-            rows={10}
-          />
+          <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} required rows={14} />
         </label>
+        <p>
+          語法提示：
+          <br />
+          方案差異：<code>[只有 EAP]...[/只有]</code>、<code>[除外 EAP]...[/除外]</code>（多個方案用「、」分隔）
+          <br />
+          多時段差異：<code>[單一時段]...[/單一時段]</code>、<code>[多個時段]...[/多個時段]</code>
+          <br />
+          粗體＋淺黃底色：<code>**文字**</code>
+        </p>
         <label>
           必填欄位（用逗號分隔，例如：caseRef, therapistName, sessionDate）
           <input
@@ -130,9 +139,7 @@ export default function TemplatesPage() {
         )}
       </form>
       {warning.length > 0 && (
-        <p role="alert">
-          注意：內文引用了未宣告的欄位（{warning.join("、")}），請確認拼字是否正確。
-        </p>
+        <p role="alert">注意：內文引用了未宣告的欄位（{warning.join("、")}），請確認拼字是否正確。</p>
       )}
     </main>
   );
