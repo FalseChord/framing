@@ -11,11 +11,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   const { id } = await params;
-  const { name, isActive } = await request.json();
+  const { name, isActive, email, note } = await request.json();
 
   const therapist = await prisma.therapist.update({
     where: { id },
-    data: { name, isActive },
+    data: { name, isActive, email: email || null, note: note || null },
   });
 
   return NextResponse.json(therapist);

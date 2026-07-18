@@ -19,11 +19,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "尚未選擇操作者" }, { status: 401 });
   }
 
-  const { name } = await request.json();
+  const { name, email, note } = await request.json();
   if (!name) {
     return NextResponse.json({ error: "姓名為必填" }, { status: 400 });
   }
 
-  const therapist = await prisma.therapist.create({ data: { name } });
+  const therapist = await prisma.therapist.create({
+    data: { name, email: email || null, note: note || null },
+  });
   return NextResponse.json(therapist, { status: 201 });
 }

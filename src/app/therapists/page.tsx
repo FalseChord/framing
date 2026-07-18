@@ -6,12 +6,16 @@ interface TherapistItem {
   id: string;
   name: string;
   isActive: boolean;
+  email: string | null;
+  note: string | null;
 }
 
 export default function TherapistsPage() {
   const [therapists, setTherapists] = useState<TherapistItem[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [note, setNote] = useState("");
   const [isActive, setIsActive] = useState(true);
 
   async function load() {
@@ -26,12 +30,16 @@ export default function TherapistsPage() {
   function startEdit(t: TherapistItem) {
     setEditingId(t.id);
     setName(t.name);
+    setEmail(t.email ?? "");
+    setNote(t.note ?? "");
     setIsActive(t.isActive);
   }
 
   function cancelEdit() {
     setEditingId(null);
     setName("");
+    setEmail("");
+    setNote("");
     setIsActive(true);
   }
 
@@ -43,10 +51,12 @@ export default function TherapistsPage() {
     await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, isActive }),
+      body: JSON.stringify({ name, email, note, isActive }),
     });
     setEditingId(null);
     setName("");
+    setEmail("");
+    setNote("");
     setIsActive(true);
     await load();
   }
@@ -59,6 +69,8 @@ export default function TherapistsPage() {
           <li key={t.id}>
             {t.name}
             {!t.isActive && "（已停用）"}
+            {t.email && ` · ${t.email}`}
+            {t.note && ` · ${t.note}`}
             <button type="button" onClick={() => startEdit(t)}>
               編輯
             </button>
@@ -70,6 +82,14 @@ export default function TherapistsPage() {
         <label>
           姓名
           <input value={name} onChange={(e) => setName(e.target.value)} required />
+        </label>
+        <label>
+          Email（選填）
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </label>
+        <label>
+          備註（選填）
+          <input value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
         {editingId && (
           <label>
