@@ -32,13 +32,20 @@ export default function SelectIdentityPage() {
   }
 
   return (
-    <main>
+    <main className="page-container" style={{ maxWidth: "480px" }}>
       <h1>請選擇目前操作者</h1>
       {error && <p role="alert">{error}</p>}
-      <ul>
+      <ul className="list">
         {users.map((u) => (
           <li key={u.id}>
-            <button onClick={() => handleSelect(u.id)}>{u.name}</button>
+            <button
+              type="button"
+              className="button button-primary"
+              onClick={() => handleSelect(u.id)}
+              style={{ width: "100%", margin: 0 }}
+            >
+              {u.name}
+            </button>
           </li>
         ))}
       </ul>
