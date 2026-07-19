@@ -7,8 +7,8 @@ import { formatSessionSlot, formatSessionSlots, type SessionSlotInput } from "@/
 interface TemplateItem {
   id: string;
   category: string;
+  variantLabel: string;
   subject: string;
-  variants: string[];
   requiredFields: string[];
 }
 
@@ -22,8 +22,8 @@ const EMPTY_SLOT: SessionSlotInput = { date: "", startTime: "", endTime: "" };
 export default function GeneratePage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
+  const [category, setCategory] = useState("");
   const [templateId, setTemplateId] = useState("");
-  const [variant, setVariant] = useState("");
   const [textFields, setTextFields] = useState<Record<string, string>>({});
   const [sessionDateValue, setSessionDateValue] = useState<SessionSlotInput>(EMPTY_SLOT);
   const [sessionSlotValues, setSessionSlotValues] = useState<SessionSlotInput[]>([EMPTY_SLOT]);
@@ -38,18 +38,29 @@ export default function GeneratePage() {
     fetch("/api/therapists").then((r) => r.json()).then(setTherapists);
   }, []);
 
+  const categories = Array.from(new Set(templates.map((t) => t.category))).sort();
+  const categoryVariants = templates.filter((t) => t.category === category);
+  const showVariantPicker = categoryVariants.length > 1;
   const selectedTemplate = templates.find((t) => t.id === templateId);
-  const showVariantPicker = (selectedTemplate?.variants.length ?? 0) > 1;
 
-  function handleTemplateChange(id: string) {
-    setTemplateId(id);
-    const t = templates.find((item) => item.id === id);
-    setVariant(t?.variants[0] ?? "");
+  function resetFormState() {
     setTextFields({});
     setSessionDateValue(EMPTY_SLOT);
     setSessionSlotValues([EMPTY_SLOT]);
     setResult(null);
     setError("");
+  }
+
+  function handleCategoryChange(nextCategory: string) {
+    setCategory(nextCategory);
+    const variants = templates.filter((t) => t.category === nextCategory);
+    setTemplateId(variants.length === 1 ? variants[0].id : "");
+    resetFormState();
+  }
+
+  function handleVariantChange(id: string) {
+    setTemplateId(id);
+    resetFormState();
   }
 
   function setTextField(name: string, value: string) {
@@ -85,7 +96,7 @@ export default function GeneratePage() {
     const res = await fetch("/api/letters/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ templateId, variant, fields, slotCount, includeLine }),
+      body: JSON.stringify({ templateId, fields, slotCount, includeLine }),
     });
 
     const data = await res.json();
@@ -115,24 +126,25 @@ export default function GeneratePage() {
       <h1>產生信件</h1>
       <form onSubmit={handleGenerate}>
         <label>
-          信件模板
-          <select value={templateId} onChange={(e) => handleTemplateChange(e.target.value)} required>
+          信件類別
+          <select value={category} onChange={(e) => handleCategoryChange(e.target.value)} required>
             <option value="">請選擇</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.category}
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
               </option>
             ))}
           </select>
         </label>
 
-        {showVariantPicker && selectedTemplate && (
+        {showVariantPicker && (
           <label>
             方案
-            <select value={variant} onChange={(e) => setVariant(e.target.value)} required>
-              {selectedTemplate.variants.map((v) => (
-                <option key={v} value={v}>
-                  {v}
+            <select value={templateId} onChange={(e) => handleVariantChange(e.target.value)} required>
+              <option value="">請選擇</option>
+              {categoryVariants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.variantLabel}
                 </option>
               ))}
             </select>
@@ -208,6 +220,7 @@ export default function GeneratePage() {
                     {sessionSlotValues.length > 1 && (
                       <button
                         type="button"
+                        className="button button-danger"
                         onClick={() => setSessionSlotValues(sessionSlotValues.filter((_, i) => i !== index))}
                       >
                         刪除
@@ -215,7 +228,7 @@ export default function GeneratePage() {
                     )}
                   </div>
                 ))}
-                <button type="button" onClick={() => setSessionSlotValues([...sessionSlotValues, EMPTY_SLOT])}>
+                <button type="button" className="button button-secondary" onClick={() => setSessionSlotValues([...sessionSlotValues, EMPTY_SLOT])}>
                   新增時段
                 </button>
               </fieldset>
@@ -243,13 +256,13 @@ export default function GeneratePage() {
             <div key={index}>
               <input type="email" value={email} onChange={(e) => updateEmailList(toEmails, setToEmails, index, e.target.value)} />
               {toEmails.length > 1 && (
-                <button type="button" onClick={() => setToEmails(toEmails.filter((_, i) => i !== index))}>
+                <button type="button" className="button button-danger" onClick={() => setToEmails(toEmails.filter((_, i) => i !== index))}>
                   刪除
                 </button>
               )}
             </div>
           ))}
-          <button type="button" onClick={() => setToEmails([...toEmails, ""])}>
+          <button type="button" className="button button-secondary" onClick={() => setToEmails([...toEmails, ""])}>
             新增收件者
           </button>
         </fieldset>
@@ -264,24 +277,24 @@ export default function GeneratePage() {
                 onChange={(e) => updateEmailList(bccEmails, setBccEmails, index, e.target.value)}
               />
               {bccEmails.length > 1 && (
-                <button type="button" onClick={() => setBccEmails(bccEmails.filter((_, i) => i !== index))}>
+                <button type="button" className="button button-danger" onClick={() => setBccEmails(bccEmails.filter((_, i) => i !== index))}>
                   刪除
                 </button>
               )}
             </div>
           ))}
-          <button type="button" onClick={() => setBccEmails([...bccEmails, ""])}>
+          <button type="button" className="button button-secondary" onClick={() => setBccEmails([...bccEmails, ""])}>
             新增密件副本
           </button>
         </fieldset>
 
         <label>
-          <input type="checkbox" checked={includeLine} onChange={(e) => setIncludeLine(e.target.checked)} />
+          <input type="checkbox" checked={includeLine} onChange={(e) => setIncludeLine(e.target.checked)} style={{ display: "inline-block", width: "auto", marginRight: "8px" }} />
           附加官方 LINE 聯繫方式
         </label>
 
         {error && <p role="alert">{error}</p>}
-        <button type="submit" disabled={!templateId}>
+        <button type="submit" className="button button-primary" disabled={!templateId}>
           產生信件
         </button>
       </form>
@@ -292,7 +305,9 @@ export default function GeneratePage() {
           <div dangerouslySetInnerHTML={{ __html: result.html }} />
           <h3>純文字版本（供核對）</h3>
           <pre>{result.plain}</pre>
-          <button onClick={handleCopyAndOpenGmail}>複製格式化內文並開啟 Gmail 草稿</button>
+          <button className="button button-primary" onClick={handleCopyAndOpenGmail}>
+            複製格式化內文並開啟 Gmail 草稿
+          </button>
         </section>
       )}
     </main>
