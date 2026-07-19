@@ -1,12 +1,10 @@
 import Handlebars from "handlebars";
-import { resolveVariantBlocks } from "./variantBlocks";
 import { resolveSlotBlocks } from "./slotBlocks";
 
 export interface RenderInput {
   templateBody: string;
   requiredFields: string[];
   fields: Record<string, string>;
-  variant: string;
   slotCount?: number;
 }
 
@@ -26,9 +24,8 @@ export function renderLetter(input: RenderInput): string {
     throw new MissingFieldsError(missing);
   }
 
-  let text = resolveVariantBlocks(input.templateBody, input.variant);
-  text = resolveSlotBlocks(text, input.slotCount ?? -1);
+  const text = resolveSlotBlocks(input.templateBody, input.slotCount ?? -1);
 
   const compiled = Handlebars.compile(text, { noEscape: true });
-  return compiled({ ...input.fields, variant: input.variant });
+  return compiled(input.fields);
 }
