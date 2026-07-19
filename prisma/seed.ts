@@ -29,24 +29,6 @@ async function main() {
     create: { id: "seed-therapist-b", name: "測試心理師B" },
   });
 
-  await prisma.template.upsert({
-    where: { id: "seed-template-matching" },
-    update: {},
-    create: {
-      id: "seed-template-matching",
-      category: "媒合信（測試）",
-      subject: "【測試】諮商媒合信",
-      body:
-        "親愛的 {{caseRef}} 您好：\n\n" +
-        "已為您媒合心理師 **{{therapistName}}**，首次晤談時間為 **{{sessionDate}}**。\n\n" +
-        "[只有 EAP]\n本次服務由貴公司 EAP 方案支付費用。\n[/只有]\n" +
-        "[除外 EAP]\n期待與您見面。\n[/除外]",
-      variants: JSON.stringify(["一般", "EAP"]),
-      requiredFields: JSON.stringify(["caseRef", "therapistName", "sessionDate"]),
-      updatedById: user.id,
-    },
-  });
-
   console.log("Seed complete (synthetic data only).");
 }
 
