@@ -21,4 +21,8 @@ describe("findUndeclaredFields", () => {
     const body = '{{#if (eq variant "EAP")}}{{caseRef}}{{else}}{{caseRef}}{{/if}}';
     expect(findUndeclaredFields(body, [])).toEqual([]);
   });
+
+  it("now flags {{variant}} as undeclared, since the variant mechanism no longer exists", () => {
+    expect(findUndeclaredFields("{{variant}}", [])).toEqual(["variant"]);
+  });
 });

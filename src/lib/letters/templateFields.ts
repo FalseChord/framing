@@ -1,4 +1,4 @@
-const STANDARD_FIELDS = ["caseRef", "therapistName", "sessionDate", "variant"];
+const STANDARD_FIELDS = ["caseRef", "therapistName", "sessionDate"];
 const HANDLEBARS_KEYWORDS = ["if", "else", "each", "eq", "unless", "this"];
 
 export function findUndeclaredFields(body: string, requiredFields: string[]): string[] {
