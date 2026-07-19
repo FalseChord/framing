@@ -290,6 +290,8 @@ export default function GeneratePage() {
           <h2>產出結果</h2>
           <p>主旨：{result.subject}</p>
           <div dangerouslySetInnerHTML={{ __html: result.html }} />
+          <h3>純文字版本（供核對）</h3>
+          <pre>{result.plain}</pre>
           <button onClick={handleCopyAndOpenGmail}>複製格式化內文並開啟 Gmail 草稿</button>
         </section>
       )}

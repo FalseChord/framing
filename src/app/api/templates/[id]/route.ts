@@ -22,6 +22,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   const { id } = await params;
   const { category, subject, body, variants, requiredFields } = await request.json();
+  if (!category || !subject || !body) {
+    return NextResponse.json({ error: "類別、標題、內文為必填" }, { status: 400 });
+  }
+
   const declaredFields: string[] = requiredFields ?? [];
   const declaredVariants: string[] = variants && variants.length > 0 ? variants : ["不適用"];
 
