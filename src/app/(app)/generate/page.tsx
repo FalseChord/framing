@@ -17,7 +17,51 @@ interface Therapist {
   name: string;
 }
 
-const EMPTY_SLOT: SessionSlotInput = { date: "", startTime: "", endTime: "" };
+type DurationMode = "50" | "80" | "other";
+
+interface SlotFormState extends SessionSlotInput {
+  durationMode: DurationMode;
+}
+
+const EMPTY_SLOT: SlotFormState = { date: "", startTime: "", durationMinutes: 50, durationMode: "50" };
+
+function DurationPicker({
+  slot,
+  onChange,
+}: {
+  slot: SlotFormState;
+  onChange: (patch: Partial<SlotFormState>) => void;
+}) {
+  return (
+    <>
+      ，時長
+      <select
+        value={slot.durationMode}
+        onChange={(e) => {
+          const mode = e.target.value as DurationMode;
+          if (mode === "50") onChange({ durationMode: "50", durationMinutes: 50 });
+          else if (mode === "80") onChange({ durationMode: "80", durationMinutes: 80 });
+          else onChange({ durationMode: "other", durationMinutes: 0 });
+        }}
+        required
+      >
+        <option value="50">50分鐘</option>
+        <option value="80">80分鐘</option>
+        <option value="other">其他</option>
+      </select>
+      {slot.durationMode === "other" && (
+        <input
+          type="number"
+          min={1}
+          value={slot.durationMinutes || ""}
+          onChange={(e) => onChange({ durationMinutes: Number(e.target.value) })}
+          placeholder="分鐘數"
+          required
+        />
+      )}
+    </>
+  );
+}
 
 export default function GeneratePage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
@@ -25,8 +69,8 @@ export default function GeneratePage() {
   const [category, setCategory] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [textFields, setTextFields] = useState<Record<string, string>>({});
-  const [sessionDateValue, setSessionDateValue] = useState<SessionSlotInput>(EMPTY_SLOT);
-  const [sessionSlotValues, setSessionSlotValues] = useState<SessionSlotInput[]>([EMPTY_SLOT]);
+  const [sessionDateValue, setSessionDateValue] = useState<SlotFormState>(EMPTY_SLOT);
+  const [sessionSlotValues, setSessionSlotValues] = useState<SlotFormState[]>([EMPTY_SLOT]);
   const [toEmails, setToEmails] = useState<string[]>([""]);
   const [bccEmails, setBccEmails] = useState<string[]>([""]);
   const [includeLine, setIncludeLine] = useState(false);
@@ -67,7 +111,7 @@ export default function GeneratePage() {
     setTextFields((prev) => ({ ...prev, [name]: value }));
   }
 
-  function updateSlot(index: number, patch: Partial<SessionSlotInput>) {
+  function updateSlot(index: number, patch: Partial<SlotFormState>) {
     setSessionSlotValues((prev) => prev.map((slot, i) => (i === index ? { ...slot, ...patch } : slot)));
   }
 
@@ -183,16 +227,14 @@ export default function GeneratePage() {
                 />
                 <input
                   type="time"
+                  step={300}
                   value={sessionDateValue.startTime}
                   onChange={(e) => setSessionDateValue({ ...sessionDateValue, startTime: e.target.value })}
                   required
                 />
-                至
-                <input
-                  type="time"
-                  value={sessionDateValue.endTime}
-                  onChange={(e) => setSessionDateValue({ ...sessionDateValue, endTime: e.target.value })}
-                  required
+                <DurationPicker
+                  slot={sessionDateValue}
+                  onChange={(patch) => setSessionDateValue({ ...sessionDateValue, ...patch })}
                 />
               </fieldset>
             );
@@ -206,17 +248,12 @@ export default function GeneratePage() {
                     <input type="date" value={slot.date} onChange={(e) => updateSlot(index, { date: e.target.value })} required />
                     <input
                       type="time"
+                      step={300}
                       value={slot.startTime}
                       onChange={(e) => updateSlot(index, { startTime: e.target.value })}
                       required
                     />
-                    至
-                    <input
-                      type="time"
-                      value={slot.endTime}
-                      onChange={(e) => updateSlot(index, { endTime: e.target.value })}
-                      required
-                    />
+                    <DurationPicker slot={slot} onChange={(patch) => updateSlot(index, patch)} />
                     {sessionSlotValues.length > 1 && (
                       <button
                         type="button"
