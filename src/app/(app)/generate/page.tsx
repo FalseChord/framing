@@ -19,6 +19,10 @@ interface Therapist {
 }
 
 const FIELD_LABELS: Record<string, string> = {
+  caseRef: "個案稱呼",
+  therapistName: "心理師",
+  sessionDate: "日期時段",
+  sessionSlots: "候選時段",
   fee: "費用",
   eapPlanName: "EAP方案名稱",
   meetLink: "視訊連結",
@@ -204,7 +208,12 @@ export default function GeneratePage() {
 
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error);
+      if (Array.isArray(data.missingFields) && data.missingFields.length > 0) {
+        const labels = data.missingFields.map((f: string) => FIELD_LABELS[f] ?? f);
+        setError(`缺少必填欄位：${labels.join("、")}`);
+      } else {
+        setError(data.error);
+      }
       return;
     }
     setResult({ subject: data.renderedSubject, html: data.renderedBodyHtml, plain: data.renderedBodyPlain });
@@ -218,13 +227,18 @@ export default function GeneratePage() {
     }
     setError("");
 
-    // result.html (toHighlightedHtml) already carries font-size:13px on every
-    // element — Gmail's own measured "一般/Normal" size. This wrapper only adds
-    // an email-safe font-family on top; it does not need to repeat font-size.
-    const htmlForClipboard = `<span style="font-family:Arial,sans-serif;">${result.html}</span>`;
-    const htmlBlob = new Blob([htmlForClipboard], { type: "text/html" });
-    const textBlob = new Blob([result.plain], { type: "text/plain" });
-    await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })]);
+    try {
+      // result.html (toHighlightedHtml) already carries font-size:13px on every
+      // element — Gmail's own measured "一般/Normal" size. This wrapper only adds
+      // an email-safe font-family on top; it does not need to repeat font-size.
+      const htmlForClipboard = `<span style="font-family:Arial,sans-serif;">${result.html}</span>`;
+      const htmlBlob = new Blob([htmlForClipboard], { type: "text/html" });
+      const textBlob = new Blob([result.plain], { type: "text/plain" });
+      await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })]);
+    } catch {
+      setError("複製到剪貼簿失敗，請確認瀏覽器已允許本網站使用剪貼簿權限");
+      return;
+    }
 
     const recipientEmails = [therapistEmail, caseEmail].filter((e) => e.trim());
     const routeToBcc = usesBcc(selectedTemplate?.category);
@@ -407,13 +421,6 @@ export default function GeneratePage() {
           <h2>產出結果</h2>
           <p>主旨：{result.subject}</p>
           <div dangerouslySetInnerHTML={{ __html: result.html }} />
-          <h3>純文字版本（供核對）</h3>
-          {/* white-space: pre-wrap (not a <pre> tag) keeps the line breaks but uses
-              the page's normal font — a <pre> here would default to a monospace
-              font, which visually reads as a different size from the HTML preview
-              above even at an identical font-size, making the two blocks look
-              misleadingly inconsistent when compared side by side on this page. */}
-          <p style={{ whiteSpace: "pre-wrap" }}>{result.plain}</p>
           <button className="button button-primary" onClick={handleCopyAndOpenGmail}>
             複製格式化內文並開啟 Gmail 草稿
           </button>
