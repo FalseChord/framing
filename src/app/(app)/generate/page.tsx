@@ -56,6 +56,37 @@ function TimeSelect({ value, onChange }: { value: string; onChange: (time: strin
   );
 }
 
+function CaseRefPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [fullName, setFullName] = useState("");
+  const surname = fullName.slice(0, 1);
+  const givenName = fullName.slice(1);
+  // 姓氏一律取第一個字，複姓（如歐陽）不會被正確拆開，需要操作者自行判斷。
+  const options = givenName ? [`${surname}先生`, `${surname}小姐`, givenName] : [];
+
+  return (
+    <>
+      <input
+        value={fullName}
+        onChange={(e) => setFullName(e.target.value)}
+        placeholder="輸入個案全名，例如：陳三一"
+      />
+      {options.map((opt) => (
+        <label key={opt} style={{ display: "inline-block", width: "auto", fontWeight: "normal", marginRight: "16px" }}>
+          <input
+            type="radio"
+            name="caseRefOption"
+            checked={value === opt}
+            onChange={() => onChange(opt)}
+            required
+            style={{ display: "inline-block", width: "auto", marginRight: "4px" }}
+          />
+          {opt}
+        </label>
+      ))}
+    </>
+  );
+}
+
 interface SlotFormState {
   date: string;
   startTime: string;
@@ -276,10 +307,10 @@ export default function GeneratePage() {
           }
           if (fieldName === "caseRef") {
             return (
-              <label key={fieldName}>
-                個案代號
-                <input value={textFields.caseRef ?? ""} onChange={(e) => setTextField("caseRef", e.target.value)} required />
-              </label>
+              <fieldset key={fieldName}>
+                <legend>個案稱呼</legend>
+                <CaseRefPicker value={textFields.caseRef ?? ""} onChange={(v) => setTextField("caseRef", v)} />
+              </fieldset>
             );
           }
           return (
