@@ -29,21 +29,20 @@ Operators are identified by picking their name from a fixed list (`/select`), no
 
 ### Privacy-by-minimization in the data model
 
-- `letters_log` (audit log) records only who/when/which template — never the case reference, recipient email, or rendered letter body.
+- There is no audit log of letter-generation activity. An earlier design kept one (`letters_log`: who/when/which template), but it was removed once the app's signature block started embedding the operator's code in every sent letter — Gmail's own sent-mail record plus that embedded signature already answers "who sent this," so a separate DB table was redundant. See `docs/superpowers/specs/2026-07-19-independent-template-variants-design.md` for the reasoning and the condition under which it would need reinstating (e.g. if operators ever stop sharing one Gmail account).
 - Recipient/BCC emails are entered per-generation in the UI and are **never persisted** — they exist only long enough to build a Gmail compose URL / clipboard payload.
 - Case references stored anywhere in the app are short pseudonymous codes (e.g. `A001`), never full case names.
 - Never write real case data into this repo or into any AI prompt — all seed/test data must be synthetic.
 
 ### Letter template rendering pipeline (`src/lib/letters/`)
 
-Each `Template` row is keyed by `category` alone (not by category+variant) — variant differences live *inside* one shared `body`/`subject` string using two independent bracket-syntax mini-languages, resolved before Handlebars compiles the remaining `{{field}}` placeholders:
+Each `Template` row is keyed by `category` **and** `variant` (`@@unique([category, variantLabel])`) — every variant of a letter (e.g. 媒合信's 一般/伴侶/青壯/重大災害/EAP/公益) is its own independent row with its own `subject`/`body`/`requiredFields`, edited separately in the templates UI. This replaced an earlier design where one row per category held all variants concatenated together behind bracket-syntax conditionals (`[只有]`/`[除外]`) — that mechanism (`variantBlocks.ts`) was deleted once every variant got its own row; see `docs/superpowers/specs/2026-07-19-independent-template-variants-design.md` for why.
 
-- `variantBlocks.ts` — `[只有 A、B]...[/只有]` (shown only for those variants) / `[除外 A、B]...[/除外]` (shown for all others). Selected variant is passed in at render time from `Template.variants` (JSON-encoded array).
-- `slotBlocks.ts` — `[單一時段]...[/單一時段]` / `[多個時段]...[/多個時段]`, chosen by how many candidate time slots the operator entered (`slotCount`), for letters that offer one vs. several proposed appointment times.
+- `slotBlocks.ts` — `[單一時段]...[/單一時段]` / `[多個時段]...[/多個時段]`, chosen by how many candidate time slots the operator entered (`slotCount`), for letters that offer one vs. several proposed appointment times. This is the one remaining bracket-syntax mini-language — it stays because it's driven by a runtime value (how many slots the operator typed), not by which variant row was selected.
 - `highlightMarkup.ts` — `**text**` always means bold + light-yellow background as one combined style (there is no bold-only or highlight-only). Produces both an HTML string (for clipboard copy into Gmail) and a plain-text fallback.
 - `dateFormat.ts` — formats a date+time range into `M/D (星期) HH:MM-HH:MM` with the weekday auto-computed from the date (never hand-typed) and **no year** in the output — this is intentional, not a gap.
 - `signature.ts` — the closing signature block is a fixed constant (not stored per-template) appended at render time, with the operator's `session.signature` code substituted in; an official LINE contact line is optionally appended per-send via a checkbox.
-- `render.ts` orchestrates: required-field check → `resolveVariantBlocks` → `resolveSlotBlocks` → Handlebars compile. `requiredFields` and `variants` are both JSON-encoded string arrays in SQLite (no native array column type) — always go through `encodeRequiredFields`/`decodeRequiredFields` (`requiredFields.ts`) at the DB boundary; never read/write the raw JSON string elsewhere.
+- `render.ts` orchestrates: required-field check → `resolveSlotBlocks` → Handlebars compile. `requiredFields` is a JSON-encoded string array in SQLite (no native array column type) — always go through `encodeRequiredFields`/`decodeRequiredFields` (`requiredFields.ts`) at the DB boundary; never read/write the raw JSON string elsewhere.
 - `templateFields.ts` — flags `{{field}}` references in a template body that aren't in its declared `requiredFields` (non-blocking warning on save, not a hard error).
 - `gmailUrl.ts` — builds a `mail.google.com/mail/?view=cm&...` compose URL. This URL's `body` param is **plain-text only** — it cannot carry bold/highlight formatting, which is why the generate page copies the HTML-formatted letter to the clipboard separately and leaves the operator to paste it into the opened draft rather than relying on the URL to fill the body.
 

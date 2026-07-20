@@ -1,3 +1,5 @@
+import "./globals.css";
+
 export const metadata = {
   title: "信件模板系統",
 };

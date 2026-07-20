@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "尚未選擇操作者" }, { status: 401 });
   }
 
-  const { templateId, fields, variant, slotCount, includeLine } = await request.json();
+  const { templateId, fields, slotCount, includeLine } = await request.json();
   const template = await prisma.template.findUnique({ where: { id: templateId } });
   if (!template) {
     return NextResponse.json({ error: "找不到模板" }, { status: 404 });
@@ -25,8 +25,8 @@ export async function POST(request: NextRequest) {
   let renderedSubject: string;
   let renderedBody: string;
   try {
-    renderedSubject = renderLetter({ templateBody: template.subject, requiredFields, fields, variant, slotCount });
-    renderedBody = renderLetter({ templateBody: template.body, requiredFields, fields, variant, slotCount });
+    renderedSubject = renderLetter({ templateBody: template.subject, requiredFields, fields, slotCount });
+    renderedBody = renderLetter({ templateBody: template.body, requiredFields, fields, slotCount });
   } catch (err) {
     if (err instanceof MissingFieldsError) {
       return NextResponse.json({ error: err.message, missingFields: err.missingFields }, { status: 400 });
@@ -39,11 +39,6 @@ export async function POST(request: NextRequest) {
     includeLine: Boolean(includeLine),
   });
   const fullBody = `${renderedBody}\n\n${signatureBlock}`;
-
-  // Audit log intentionally excludes caseRef, recipient email, and the rendered body itself.
-  await prisma.letterLog.create({
-    data: { userId: session.userId, templateId: template.id },
-  });
 
   return NextResponse.json({
     renderedSubject: stripHighlightMarkers(renderedSubject),

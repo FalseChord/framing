@@ -54,11 +54,13 @@ export default function UsersPage() {
   return (
     <main>
       <h1>操作者名單管理</h1>
-      <ul>
+      <ul className="list">
         {users.map((u) => (
           <li key={u.id}>
-            {u.name}（簽名代號：{u.signature}）
-            <button type="button" onClick={() => startEdit(u)}>
+            <span>
+              {u.name}（簽名代號：{u.signature}）
+            </span>
+            <button type="button" className="button button-secondary" onClick={() => startEdit(u)}>
               編輯
             </button>
           </li>
@@ -74,9 +76,11 @@ export default function UsersPage() {
           簽名代號
           <input value={signature} onChange={(e) => setSignature(e.target.value)} required />
         </label>
-        <button type="submit">{editingId ? "儲存修改" : "新增操作者"}</button>
+        <button type="submit" className="button button-primary">
+          {editingId ? "儲存修改" : "新增操作者"}
+        </button>
         {editingId && (
-          <button type="button" onClick={cancelEdit}>
+          <button type="button" className="button button-secondary" onClick={cancelEdit}>
             取消編輯
           </button>
         )}

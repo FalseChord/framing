@@ -64,14 +64,16 @@ export default function TherapistsPage() {
   return (
     <main>
       <h1>心理師名單管理</h1>
-      <ul>
+      <ul className="list">
         {therapists.map((t) => (
           <li key={t.id}>
-            {t.name}
-            {!t.isActive && "（已停用）"}
-            {t.email && ` · ${t.email}`}
-            {t.note && ` · ${t.note}`}
-            <button type="button" onClick={() => startEdit(t)}>
+            <span>
+              {t.name}
+              {!t.isActive && "（已停用）"}
+              {t.email && ` · ${t.email}`}
+              {t.note && ` · ${t.note}`}
+            </span>
+            <button type="button" className="button button-secondary" onClick={() => startEdit(t)}>
               編輯
             </button>
           </li>
@@ -93,13 +95,20 @@ export default function TherapistsPage() {
         </label>
         {editingId && (
           <label>
-            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
+              style={{ display: "inline-block", width: "auto", marginRight: "8px" }}
+            />
             啟用中（取消勾選可停用，不會出現在產信下拉選單）
           </label>
         )}
-        <button type="submit">{editingId ? "儲存修改" : "新增心理師"}</button>
+        <button type="submit" className="button button-primary">
+          {editingId ? "儲存修改" : "新增心理師"}
+        </button>
         {editingId && (
-          <button type="button" onClick={cancelEdit}>
+          <button type="button" className="button button-secondary" onClick={cancelEdit}>
             取消編輯
           </button>
         )}
