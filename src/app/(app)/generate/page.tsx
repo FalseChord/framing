@@ -127,8 +127,6 @@ export default function GeneratePage() {
   const [sessionSlotValues, setSessionSlotValues] = useState<SlotFormState[]>([makeEmptySlot(undefined)]);
   const [therapistEmail, setTherapistEmail] = useState("");
   const [caseEmail, setCaseEmail] = useState("");
-  const [toEmails, setToEmails] = useState<string[]>([""]);
-  const [bccEmails, setBccEmails] = useState<string[]>([""]);
   const [includeLine, setIncludeLine] = useState(false);
   const [result, setResult] = useState<{ subject: string; html: string; plain: string } | null>(null);
   const [error, setError] = useState("");
@@ -178,10 +176,6 @@ export default function GeneratePage() {
 
   function updateSlot(index: number, patch: Partial<SlotFormState>) {
     setSessionSlotValues((prev) => prev.map((slot, i) => (i === index ? { ...slot, ...patch } : slot)));
-  }
-
-  function updateEmailList(list: string[], setList: (v: string[]) => void, index: number, value: string) {
-    setList(list.map((email, i) => (i === index ? value : email)));
   }
 
   async function handleGenerate(e: React.FormEvent) {
@@ -235,13 +229,11 @@ export default function GeneratePage() {
     await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })]);
 
     const recipientEmails = [therapistEmail, caseEmail].filter((e) => e.trim());
-    const manualTo = toEmails.filter((e) => e.trim());
-    const manualBcc = bccEmails.filter((e) => e.trim());
     const routeToBcc = usesBcc(selectedTemplate?.category);
 
     const url = buildGmailComposeUrl({
-      to: (routeToBcc ? manualTo : [...recipientEmails, ...manualTo]).join(","),
-      bcc: (routeToBcc ? [...recipientEmails, ...manualBcc] : manualBcc).join(","),
+      to: (routeToBcc ? [] : recipientEmails).join(","),
+      bcc: (routeToBcc ? recipientEmails : []).join(","),
       subject: result.subject,
     });
     window.open(url, "_blank");
@@ -401,44 +393,6 @@ export default function GeneratePage() {
             </label>
           </fieldset>
         )}
-
-        <fieldset>
-          <legend>其他收件者（選填，可新增多筆）</legend>
-          {toEmails.map((email, index) => (
-            <div key={index}>
-              <input type="email" value={email} onChange={(e) => updateEmailList(toEmails, setToEmails, index, e.target.value)} />
-              {toEmails.length > 1 && (
-                <button type="button" className="button button-danger" onClick={() => setToEmails(toEmails.filter((_, i) => i !== index))}>
-                  刪除
-                </button>
-              )}
-            </div>
-          ))}
-          <button type="button" className="button button-secondary" onClick={() => setToEmails([...toEmails, ""])}>
-            新增收件者
-          </button>
-        </fieldset>
-
-        <fieldset>
-          <legend>其他密件副本 BCC（選填，可新增多筆）</legend>
-          {bccEmails.map((email, index) => (
-            <div key={index}>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => updateEmailList(bccEmails, setBccEmails, index, e.target.value)}
-              />
-              {bccEmails.length > 1 && (
-                <button type="button" className="button button-danger" onClick={() => setBccEmails(bccEmails.filter((_, i) => i !== index))}>
-                  刪除
-                </button>
-              )}
-            </div>
-          ))}
-          <button type="button" className="button button-secondary" onClick={() => setBccEmails([...bccEmails, ""])}>
-            新增密件副本
-          </button>
-        </fieldset>
 
         <label>
           <input type="checkbox" checked={includeLine} onChange={(e) => setIncludeLine(e.target.checked)} style={{ display: "inline-block", width: "auto", marginRight: "8px" }} />
