@@ -218,12 +218,10 @@ export default function GeneratePage() {
     }
     setError("");
 
-    // No CSS font-size on a wrapping element — two earlier attempts (an explicit
-    // 14px, then the `small` keyword Gmail's own "一般" preset is documented to use)
-    // both still pasted oversized. Gmail's compose toolbar historically emits legacy
-    // <font size="N"> tags for its size presets rather than CSS, so this tries that
-    // instead — <font size="2"> is Gmail's own "一般/Normal" preset.
-    const htmlForClipboard = `<font face="Arial, sans-serif" size="2">${result.html}</font>`;
+    // result.html (toHighlightedHtml) already carries font-size:13px on every
+    // element — Gmail's own measured "一般/Normal" size. This wrapper only adds
+    // an email-safe font-family on top; it does not need to repeat font-size.
+    const htmlForClipboard = `<span style="font-family:Arial,sans-serif;">${result.html}</span>`;
     const htmlBlob = new Blob([htmlForClipboard], { type: "text/html" });
     const textBlob = new Blob([result.plain], { type: "text/plain" });
     await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })]);
