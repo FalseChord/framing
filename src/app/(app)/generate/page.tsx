@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { buildGmailComposeUrl } from "@/lib/letters/gmailUrl";
-import { formatSessionSlot, formatSessionSlots, type SessionSlotInput } from "@/lib/letters/dateFormat";
+import { formatSessionSlot, formatSessionSlots } from "@/lib/letters/dateFormat";
 
 interface TemplateItem {
   id: string;
@@ -56,50 +56,16 @@ function TimeSelect({ value, onChange }: { value: string; onChange: (time: strin
   );
 }
 
-type DurationMode = "50" | "80" | "other";
-
-interface SlotFormState extends SessionSlotInput {
-  durationMode: DurationMode;
+interface SlotFormState {
+  date: string;
+  startTime: string;
 }
 
-const EMPTY_SLOT: SlotFormState = { date: "", startTime: "", durationMinutes: 50, durationMode: "50" };
+const EMPTY_SLOT: SlotFormState = { date: "", startTime: "" };
 
-function DurationPicker({
-  slot,
-  onChange,
-}: {
-  slot: SlotFormState;
-  onChange: (patch: Partial<SlotFormState>) => void;
-}) {
-  return (
-    <>
-      ，時長
-      <select
-        value={slot.durationMode}
-        onChange={(e) => {
-          const mode = e.target.value as DurationMode;
-          if (mode === "50") onChange({ durationMode: "50", durationMinutes: 50 });
-          else if (mode === "80") onChange({ durationMode: "80", durationMinutes: 80 });
-          else onChange({ durationMode: "other", durationMinutes: 0 });
-        }}
-        required
-      >
-        <option value="50">50分鐘</option>
-        <option value="80">80分鐘</option>
-        <option value="other">其他</option>
-      </select>
-      {slot.durationMode === "other" && (
-        <input
-          type="number"
-          min={1}
-          value={slot.durationMinutes || ""}
-          onChange={(e) => onChange({ durationMinutes: Number(e.target.value) })}
-          placeholder="分鐘數"
-          required
-        />
-      )}
-    </>
-  );
+// 伴侶/家庭方案固定 80 分鐘，其他所有方案固定 50 分鐘 —— 時長由方案決定，操作者不需要（也不能）另外選擇。
+function getDurationMinutes(variantLabel: string | undefined): number {
+  return variantLabel === "伴侶/家庭" ? 80 : 50;
 }
 
 export default function GeneratePage() {
@@ -165,12 +131,17 @@ export default function GeneratePage() {
 
     const fields: Record<string, string> = { ...textFields };
     let slotCount: number | undefined;
+    const durationMinutes = getDurationMinutes(selectedTemplate.variantLabel);
 
     if (selectedTemplate.requiredFields.includes("sessionDate")) {
-      fields.sessionDate = sessionDateValue.date ? formatSessionSlot(sessionDateValue) : "";
+      fields.sessionDate = sessionDateValue.date
+        ? formatSessionSlot({ ...sessionDateValue, durationMinutes })
+        : "";
     }
     if (selectedTemplate.requiredFields.includes("sessionSlots")) {
-      const filledSlots = sessionSlotValues.filter((slot) => slot.date);
+      const filledSlots = sessionSlotValues
+        .filter((slot) => slot.date)
+        .map((slot) => ({ ...slot, durationMinutes }));
       const formatted = formatSessionSlots(filledSlots);
       fields.sessionSlots = formatted.text;
       slotCount = formatted.count;
@@ -271,17 +242,14 @@ export default function GeneratePage() {
                   value={sessionDateValue.startTime}
                   onChange={(startTime) => setSessionDateValue({ ...sessionDateValue, startTime })}
                 />
-                <DurationPicker
-                  slot={sessionDateValue}
-                  onChange={(patch) => setSessionDateValue({ ...sessionDateValue, ...patch })}
-                />
+                （時長 {getDurationMinutes(selectedTemplate?.variantLabel)} 分鐘）
               </fieldset>
             );
           }
           if (fieldName === "sessionSlots") {
             return (
               <fieldset key={fieldName}>
-                <legend>候選時段（可新增多筆）</legend>
+                <legend>候選時段（可新增多筆，時長 {getDurationMinutes(selectedTemplate?.variantLabel)} 分鐘）</legend>
                 {sessionSlotValues.map((slot, index) => (
                   <div key={index}>
                     <input type="date" value={slot.date} onChange={(e) => updateSlot(index, { date: e.target.value })} required />
@@ -289,7 +257,6 @@ export default function GeneratePage() {
                       value={slot.startTime}
                       onChange={(startTime) => updateSlot(index, { startTime })}
                     />
-                    <DurationPicker slot={slot} onChange={(patch) => updateSlot(index, patch)} />
                     {sessionSlotValues.length > 1 && (
                       <button
                         type="button"

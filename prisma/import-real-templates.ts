@@ -102,7 +102,7 @@ async function main() {
     create: {
       id: "real-template-matching-couple",
       category: "媒合信",
-      variantLabel: "伴侶",
+      variantLabel: "伴侶/家庭",
       subject: "[加惠心理諮商]諮商媒合信",
       body: "{{caseRef}}，您好：\n\n感謝您填寫線上預約表單，加惠已依照您的需求媒合上 **{{therapistName}}** 心理師，\n心理師想詢問您：**{{sessionSlots}}**，是否方便進行第一次伴侶諮商呢？\n若不方便，再麻煩您提供幾個方便的時段給我們，我們會再為您與心理師確認。\n\n同時也讓您知道，**{{therapistName}}**心理師的諮商晤談費用為：**{{fee}}**元 / 80分鐘\n再麻煩您回信或來電確認諮商時間。",
       requiredFields: JSON.stringify(["caseRef","therapistName","sessionSlots","fee"]),
@@ -186,7 +186,7 @@ async function main() {
     create: {
       id: "real-template-preparation-couple",
       category: "準備信",
-      variantLabel: "伴侶",
+      variantLabel: "伴侶/家庭",
       subject: "[加惠心理諮商]諮商準備信",
       body: "{{caseRef}}，您好：\n\n我們已幫您與 **{{therapistName}}** 心理師 完成諮商預約，\n將於 **{{sessionSlots}}** 進行第一次伴侶諮商。\n\n當天請您們盡可能 **提前 5~10分鐘** 抵達加惠諮商所（臺北市復興北路181號7樓之五），值班人員會為您介紹加惠空間，並且請您填寫資料表。\n\n此外，加惠提供您諮商前可以做的參考與準備：\n\n◉ 初次諮商前盡可能預留一些時間沉澱心思，思考在會談中該如何講您想處理的困擾。\n◉ 每個人初次諮商後的反應不同，有些人初次諮商後情緒張力可能會很大，會談結束後您不一定能馬上回到平常生活狀態，盡可能在初次諮商結束後不要安排其他行程，給自己預留時間調適。\n◉ 初次諮商前，您可能感到緊張，擔心在諮商時間內講不清楚自己的困擾，這是難免的。不過心理師將帶您一起釐清您的困擾，不必太擔心。\n◉ 初次諮商的前一刻，您可能感到某種抗拒，這是正常的，因為要向人敞開心房，難免想要自我保護。邀請您謝謝這個自我保護以及背後的善意，同時看見心底想要有所不同的渴望，允許自己帶著一些不舒服的感覺前來會談。\n◉ 由於諮商對生活會造成某些影響，初次諮商後您可以想想什麼時段進行會談對您最有幫助，並再與您的心理師調整諮商時段。\n◉ 初次諮商後，與心理師會談的感受與原先期待可能有所不同，即使第一次諮商有不舒服或不如預期的感覺，加惠也建議您至少再見一次心理師，並當面向心理師表達您的真實感受，每一次您與心理師開放地討論，都有可能為您自己帶來新的洞見。",
       requiredFields: JSON.stringify(["caseRef","therapistName","sessionSlots"]),
