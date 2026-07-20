@@ -21,6 +21,23 @@ npx prisma db seed                     # run prisma/seed.ts (synthetic data, ide
 npx prisma studio                      # browser-based DB viewer/editor, used for local data setup
 ```
 
+### `prisma generate` path-baking hazard — verify after every run
+
+`prisma generate` (and `migrate dev`, which calls it implicitly) bakes an **absolute filesystem path** to `schema.prisma`/`.env` into the generated client at `node_modules/.prisma/client/*.js`. If this repo is ever worked on across multiple git worktrees (e.g. an isolated worktree for one change, the main checkout for another), a `generate` run whose working directory resolution goes wrong can bake a *worktree's* path into the client — and because that client lives in a shared `node_modules`, it silently breaks every other checkout that imports `@prisma/client`, including the main one: `npm run dev` run correctly from the main folder will still connect to the wrong (worktree's throwaway) SQLite file, with no error, just data that looks "reset" or "wrong."
+
+This isn't hypothetical — it happened once (2026-07-20) and cost significant time to trace back to this rather than assuming data was actually lost.
+
+**After every `prisma generate` / `migrate dev` in this repo, verify the baked path before trusting the result:**
+
+```bash
+grep -o "worktrees/[^\"']*" node_modules/.prisma/client/*.js
+# must print nothing (or only an intentionally worktree-local install)
+```
+
+If it prints a worktree path while you're working from the main checkout, re-run generate with an explicit absolute schema path to force the correct resolution: `npx prisma generate --schema=/absolute/path/to/prisma/schema.prisma`, then re-verify.
+
+If a running `npm run dev` process still shows stale/wrong data after fixing the generated client, check whether an old process is still holding the previous (mis-baked) client in memory: `lsof -p <pid> | grep dev.db` shows exactly which physical `.db` file a running server has open. Kill it and restart rather than assuming the fix didn't work.
+
 ## Architecture
 
 ### No password, ever — by design
