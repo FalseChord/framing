@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { buildGmailComposeUrl } from "@/lib/letters/gmailUrl";
 import { formatSessionSlot, formatSessionSlots } from "@/lib/letters/dateFormat";
 
@@ -21,56 +21,44 @@ const FIELD_LABELS: Record<string, string> = {
   fee: "費用",
 };
 
-const TIME_SELECT_HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"));
-const TIME_SELECT_MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
-
-function padTimePart(v: string): string {
+function padTimePart(v: string, max: number): string {
   const n = parseInt(v, 10);
-  return Number.isNaN(n) ? "" : String(n).padStart(2, "0");
+  return Number.isNaN(n) ? "" : String(Math.min(Math.max(n, 0), max)).padStart(2, "0");
 }
 
-// Free-typing input backed by a <datalist> suggestion list, instead of a native
-// <select> — faster to use than scrolling a 24-option dropdown, and lets the
-// operator type an odd time (e.g. 19:07) that isn't in the 5-minute list.
+// Plain number inputs — no dropdown, no autocomplete/filter behavior to fight.
+// The operator can type any hour/minute directly; padded to two digits on blur.
 function TimeSelect({ value, onChange }: { value: string; onChange: (time: string) => void }) {
-  const id = useId();
   const [hour, minute] = value.split(":");
 
   return (
     <>
       <input
-        list={`${id}-hours`}
+        type="number"
+        min={0}
+        max={23}
         value={hour ?? ""}
         onChange={(e) => onChange(`${e.target.value}:${minute ?? "00"}`)}
-        onBlur={(e) => onChange(`${padTimePart(e.target.value)}:${minute ?? "00"}`)}
+        onBlur={(e) => onChange(`${padTimePart(e.target.value, 23)}:${minute ?? "00"}`)}
         placeholder="時"
-        maxLength={2}
-        style={{ width: "3em" }}
+        style={{ width: "4em" }}
         required
         aria-label="時"
       />
-      <datalist id={`${id}-hours`}>
-        {TIME_SELECT_HOURS.map((h) => (
-          <option key={h} value={h} />
-        ))}
-      </datalist>
       :
       <input
-        list={`${id}-minutes`}
+        type="number"
+        min={0}
+        max={59}
+        step={5}
         value={minute ?? ""}
         onChange={(e) => onChange(`${hour ?? "00"}:${e.target.value}`)}
-        onBlur={(e) => onChange(`${hour ?? "00"}:${padTimePart(e.target.value)}`)}
+        onBlur={(e) => onChange(`${hour ?? "00"}:${padTimePart(e.target.value, 59)}`)}
         placeholder="分"
-        maxLength={2}
-        style={{ width: "3em" }}
+        style={{ width: "4em" }}
         required
         aria-label="分"
       />
-      <datalist id={`${id}-minutes`}>
-        {TIME_SELECT_MINUTES.map((m) => (
-          <option key={m} value={m} />
-        ))}
-      </datalist>
     </>
   );
 }
@@ -213,11 +201,12 @@ export default function GeneratePage() {
 
   async function handleCopyAndOpenGmail() {
     if (!result) return;
-    // Gmail's own font-size dropdown maps "一般/Normal" to the CSS keyword `small`
-    // (not a specific px value) in the HTML it generates — matching that exactly is
-    // what makes pasted content look the same size as text typed directly in Gmail.
-    const htmlForClipboard = `<span style="font-family:Arial,sans-serif;font-size:small;">${result.html}</span>`;
-    const htmlBlob = new Blob([htmlForClipboard], { type: "text/html" });
+    // No explicit font-family/font-size here, on purpose: Gmail's paste handler only
+    // keeps its own ambient compose font/size (the same thing plain-text paste relies
+    // on) when the pasted HTML doesn't specify one itself. Every attempt at specifying
+    // an explicit size (14px, then the `small` keyword Gmail's own UI emits) pasted
+    // larger than normal, while leaving it unset matches plain-text sizing exactly.
+    const htmlBlob = new Blob([result.html], { type: "text/html" });
     const textBlob = new Blob([result.plain], { type: "text/plain" });
     await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })]);
 
