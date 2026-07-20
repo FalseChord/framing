@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { buildGmailComposeUrl } from "@/lib/letters/gmailUrl";
 import { formatSessionSlot, formatSessionSlots } from "@/lib/letters/dateFormat";
 
@@ -17,41 +17,60 @@ interface Therapist {
   name: string;
 }
 
+const FIELD_LABELS: Record<string, string> = {
+  fee: "費用",
+};
+
 const TIME_SELECT_HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"));
 const TIME_SELECT_MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
 
+function padTimePart(v: string): string {
+  const n = parseInt(v, 10);
+  return Number.isNaN(n) ? "" : String(n).padStart(2, "0");
+}
+
+// Free-typing input backed by a <datalist> suggestion list, instead of a native
+// <select> — faster to use than scrolling a 24-option dropdown, and lets the
+// operator type an odd time (e.g. 19:07) that isn't in the 5-minute list.
 function TimeSelect({ value, onChange }: { value: string; onChange: (time: string) => void }) {
+  const id = useId();
   const [hour, minute] = value.split(":");
 
   return (
     <>
-      <select
+      <input
+        list={`${id}-hours`}
         value={hour ?? ""}
         onChange={(e) => onChange(`${e.target.value}:${minute ?? "00"}`)}
+        onBlur={(e) => onChange(`${padTimePart(e.target.value)}:${minute ?? "00"}`)}
+        placeholder="時"
+        maxLength={2}
+        style={{ width: "3em" }}
         required
         aria-label="時"
-      >
-        <option value="">時</option>
+      />
+      <datalist id={`${id}-hours`}>
         {TIME_SELECT_HOURS.map((h) => (
-          <option key={h} value={h}>
-            {h}
-          </option>
+          <option key={h} value={h} />
         ))}
-      </select>
+      </datalist>
       :
-      <select
+      <input
+        list={`${id}-minutes`}
         value={minute ?? ""}
         onChange={(e) => onChange(`${hour ?? "00"}:${e.target.value}`)}
+        onBlur={(e) => onChange(`${hour ?? "00"}:${padTimePart(e.target.value)}`)}
+        placeholder="分"
+        maxLength={2}
+        style={{ width: "3em" }}
         required
         aria-label="分"
-      >
-        <option value="">分</option>
+      />
+      <datalist id={`${id}-minutes`}>
         {TIME_SELECT_MINUTES.map((m) => (
-          <option key={m} value={m}>
-            {m}
-          </option>
+          <option key={m} value={m} />
         ))}
-      </select>
+      </datalist>
     </>
   );
 }
@@ -194,9 +213,10 @@ export default function GeneratePage() {
 
   async function handleCopyAndOpenGmail() {
     if (!result) return;
-    // Wrapped with an explicit normal-size font so Gmail's paste handler doesn't
-    // fall back to an oversized default for unstyled pasted HTML.
-    const htmlForClipboard = `<span style="font-family:Arial,sans-serif;font-size:14px;">${result.html}</span>`;
+    // Gmail's own font-size dropdown maps "一般/Normal" to the CSS keyword `small`
+    // (not a specific px value) in the HTML it generates — matching that exactly is
+    // what makes pasted content look the same size as text typed directly in Gmail.
+    const htmlForClipboard = `<span style="font-family:Arial,sans-serif;font-size:small;">${result.html}</span>`;
     const htmlBlob = new Blob([htmlForClipboard], { type: "text/html" });
     const textBlob = new Blob([result.plain], { type: "text/plain" });
     await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })]);
@@ -315,7 +335,7 @@ export default function GeneratePage() {
           }
           return (
             <label key={fieldName}>
-              {fieldName}
+              {FIELD_LABELS[fieldName] ?? fieldName}
               <input value={textFields[fieldName] ?? ""} onChange={(e) => setTextField(fieldName, e.target.value)} required />
             </label>
           );
