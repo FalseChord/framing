@@ -410,7 +410,12 @@ export default function GeneratePage() {
           <p>主旨：{result.subject}</p>
           <div dangerouslySetInnerHTML={{ __html: result.html }} />
           <h3>純文字版本（供核對）</h3>
-          <pre>{result.plain}</pre>
+          {/* white-space: pre-wrap (not a <pre> tag) keeps the line breaks but uses
+              the page's normal font — a <pre> here would default to a monospace
+              font, which visually reads as a different size from the HTML preview
+              above even at an identical font-size, making the two blocks look
+              misleadingly inconsistent when compared side by side on this page. */}
+          <p style={{ whiteSpace: "pre-wrap" }}>{result.plain}</p>
           <button className="button button-primary" onClick={handleCopyAndOpenGmail}>
             複製格式化內文並開啟 Gmail 草稿
           </button>
