@@ -19,6 +19,13 @@ describe("toHighlightedHtml", () => {
   it("escapes HTML special characters in plain text", () => {
     expect(toHighlightedHtml("A<B>C")).toBe("A&lt;B&gt;C");
   });
+
+  it("matches a highlighted span that itself contains a newline (e.g. multiple candidate slots)", () => {
+    const result = toHighlightedHtml("時段：**◉ 7/22 (三) 19:00-19:50\n◉ 7/24 (五) 20:00-20:50**，請確認");
+    expect(result).toBe(
+      '時段：<b style="background-color:#fff59d">◉ 7/22 (三) 19:00-19:50<br>◉ 7/24 (五) 20:00-20:50</b>，請確認'
+    );
+  });
 });
 
 describe("stripHighlightMarkers", () => {
