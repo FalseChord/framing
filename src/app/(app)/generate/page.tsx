@@ -15,10 +15,13 @@ interface TemplateItem {
 interface Therapist {
   id: string;
   name: string;
+  email: string | null;
 }
 
 const FIELD_LABELS: Record<string, string> = {
   fee: "費用",
+  eapPlanName: "EAP方案名稱",
+  meetLink: "視訊連結",
 };
 
 function padTimePart(v: string, max: number): string {
@@ -97,13 +100,21 @@ function CaseRefPicker({ value, onChange }: { value: string; onChange: (v: strin
 interface SlotFormState {
   date: string;
   startTime: string;
+  durationMinutes: number;
 }
 
-const EMPTY_SLOT: SlotFormState = { date: "", startTime: "" };
-
-// 伴侶/家庭方案固定 80 分鐘，其他所有方案固定 50 分鐘 —— 時長由方案決定，操作者不需要（也不能）另外選擇。
-function getDurationMinutes(variantLabel: string | undefined): number {
+// 伴侶/家庭方案預設 80 分鐘，其他所有方案預設 50 分鐘 —— 只是預設值，操作者仍可自行修改。
+function getDefaultDurationMinutes(variantLabel: string | undefined): number {
   return variantLabel === "伴侶/家庭" ? 80 : 50;
+}
+
+function makeEmptySlot(variantLabel: string | undefined): SlotFormState {
+  return { date: "", startTime: "", durationMinutes: getDefaultDurationMinutes(variantLabel) };
+}
+
+// 媒合信用一般收件者，其他信件類別一律用密件副本 BCC，避免多位收件者互看到彼此的信箱。
+function usesBcc(category: string | undefined): boolean {
+  return category !== undefined && category !== "媒合信";
 }
 
 export default function GeneratePage() {
@@ -112,8 +123,10 @@ export default function GeneratePage() {
   const [category, setCategory] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [textFields, setTextFields] = useState<Record<string, string>>({});
-  const [sessionDateValue, setSessionDateValue] = useState<SlotFormState>(EMPTY_SLOT);
-  const [sessionSlotValues, setSessionSlotValues] = useState<SlotFormState[]>([EMPTY_SLOT]);
+  const [sessionDateValue, setSessionDateValue] = useState<SlotFormState>(makeEmptySlot(undefined));
+  const [sessionSlotValues, setSessionSlotValues] = useState<SlotFormState[]>([makeEmptySlot(undefined)]);
+  const [therapistEmail, setTherapistEmail] = useState("");
+  const [caseEmail, setCaseEmail] = useState("");
   const [toEmails, setToEmails] = useState<string[]>([""]);
   const [bccEmails, setBccEmails] = useState<string[]>([""]);
   const [includeLine, setIncludeLine] = useState(false);
@@ -130,10 +143,17 @@ export default function GeneratePage() {
   const showVariantPicker = categoryVariants.length > 1;
   const selectedTemplate = templates.find((t) => t.id === templateId);
 
-  function resetFormState() {
+  // 選了心理師後，自動從資料庫帶入該心理師的 Email（操作者仍可手動修改/覆寫）。
+  useEffect(() => {
+    const match = therapists.find((t) => t.name === textFields.therapistName);
+    setTherapistEmail(match?.email ?? "");
+  }, [textFields.therapistName, therapists]);
+
+  function resetFormState(variantLabel: string | undefined) {
     setTextFields({});
-    setSessionDateValue(EMPTY_SLOT);
-    setSessionSlotValues([EMPTY_SLOT]);
+    setSessionDateValue(makeEmptySlot(variantLabel));
+    setSessionSlotValues([makeEmptySlot(variantLabel)]);
+    setCaseEmail("");
     setResult(null);
     setError("");
   }
@@ -141,13 +161,15 @@ export default function GeneratePage() {
   function handleCategoryChange(nextCategory: string) {
     setCategory(nextCategory);
     const variants = templates.filter((t) => t.category === nextCategory);
-    setTemplateId(variants.length === 1 ? variants[0].id : "");
-    resetFormState();
+    const nextId = variants.length === 1 ? variants[0].id : "";
+    setTemplateId(nextId);
+    resetFormState(variants.length === 1 ? variants[0].variantLabel : undefined);
   }
 
   function handleVariantChange(id: string) {
     setTemplateId(id);
-    resetFormState();
+    const t = templates.find((x) => x.id === id);
+    resetFormState(t?.variantLabel);
   }
 
   function setTextField(name: string, value: string) {
@@ -169,17 +191,12 @@ export default function GeneratePage() {
 
     const fields: Record<string, string> = { ...textFields };
     let slotCount: number | undefined;
-    const durationMinutes = getDurationMinutes(selectedTemplate.variantLabel);
 
     if (selectedTemplate.requiredFields.includes("sessionDate")) {
-      fields.sessionDate = sessionDateValue.date
-        ? formatSessionSlot({ ...sessionDateValue, durationMinutes })
-        : "";
+      fields.sessionDate = sessionDateValue.date ? formatSessionSlot(sessionDateValue) : "";
     }
     if (selectedTemplate.requiredFields.includes("sessionSlots")) {
-      const filledSlots = sessionSlotValues
-        .filter((slot) => slot.date)
-        .map((slot) => ({ ...slot, durationMinutes }));
+      const filledSlots = sessionSlotValues.filter((slot) => slot.date);
       const formatted = formatSessionSlots(filledSlots);
       fields.sessionSlots = formatted.text;
       slotCount = formatted.count;
@@ -201,18 +218,30 @@ export default function GeneratePage() {
 
   async function handleCopyAndOpenGmail() {
     if (!result) return;
-    // No explicit font-family/font-size here, on purpose: Gmail's paste handler only
-    // keeps its own ambient compose font/size (the same thing plain-text paste relies
-    // on) when the pasted HTML doesn't specify one itself. Every attempt at specifying
-    // an explicit size (14px, then the `small` keyword Gmail's own UI emits) pasted
-    // larger than normal, while leaving it unset matches plain-text sizing exactly.
-    const htmlBlob = new Blob([result.html], { type: "text/html" });
+    if (!therapistEmail.trim() || !caseEmail.trim()) {
+      setError("請先填寫心理師與個案的 Email，才能開啟 Gmail 草稿");
+      return;
+    }
+    setError("");
+
+    // No CSS font-size on a wrapping element — two earlier attempts (an explicit
+    // 14px, then the `small` keyword Gmail's own "一般" preset is documented to use)
+    // both still pasted oversized. Gmail's compose toolbar historically emits legacy
+    // <font size="N"> tags for its size presets rather than CSS, so this tries that
+    // instead — <font size="2"> is Gmail's own "一般/Normal" preset.
+    const htmlForClipboard = `<font face="Arial, sans-serif" size="2">${result.html}</font>`;
+    const htmlBlob = new Blob([htmlForClipboard], { type: "text/html" });
     const textBlob = new Blob([result.plain], { type: "text/plain" });
     await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })]);
 
+    const recipientEmails = [therapistEmail, caseEmail].filter((e) => e.trim());
+    const manualTo = toEmails.filter((e) => e.trim());
+    const manualBcc = bccEmails.filter((e) => e.trim());
+    const routeToBcc = usesBcc(selectedTemplate?.category);
+
     const url = buildGmailComposeUrl({
-      to: toEmails.filter((e) => e.trim()).join(","),
-      bcc: bccEmails.filter((e) => e.trim()).join(","),
+      to: (routeToBcc ? manualTo : [...recipientEmails, ...manualTo]).join(","),
+      bcc: (routeToBcc ? [...recipientEmails, ...manualBcc] : manualBcc).join(","),
       subject: result.subject,
     });
     window.open(url, "_blank");
@@ -272,31 +301,54 @@ export default function GeneratePage() {
             return (
               <fieldset key={fieldName}>
                 <legend>日期時段</legend>
-                <input
-                  type="date"
-                  value={sessionDateValue.date}
-                  onChange={(e) => setSessionDateValue({ ...sessionDateValue, date: e.target.value })}
-                  required
-                />
-                <TimeSelect
-                  value={sessionDateValue.startTime}
-                  onChange={(startTime) => setSessionDateValue({ ...sessionDateValue, startTime })}
-                />
-                （時長 {getDurationMinutes(selectedTemplate?.variantLabel)} 分鐘）
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <input
+                    type="date"
+                    value={sessionDateValue.date}
+                    onChange={(e) => setSessionDateValue({ ...sessionDateValue, date: e.target.value })}
+                    required
+                  />
+                  <TimeSelect
+                    value={sessionDateValue.startTime}
+                    onChange={(startTime) => setSessionDateValue({ ...sessionDateValue, startTime })}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={sessionDateValue.durationMinutes}
+                    onChange={(e) =>
+                      setSessionDateValue({ ...sessionDateValue, durationMinutes: Number(e.target.value) })
+                    }
+                    style={{ width: "4em" }}
+                    required
+                    aria-label="時長（分鐘）"
+                  />
+                  分鐘
+                </div>
               </fieldset>
             );
           }
           if (fieldName === "sessionSlots") {
             return (
               <fieldset key={fieldName}>
-                <legend>候選時段（可新增多筆，時長 {getDurationMinutes(selectedTemplate?.variantLabel)} 分鐘）</legend>
+                <legend>候選時段（可新增多筆）</legend>
                 {sessionSlotValues.map((slot, index) => (
-                  <div key={index}>
+                  <div
+                    key={index}
+                    style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}
+                  >
                     <input type="date" value={slot.date} onChange={(e) => updateSlot(index, { date: e.target.value })} required />
-                    <TimeSelect
-                      value={slot.startTime}
-                      onChange={(startTime) => updateSlot(index, { startTime })}
+                    <TimeSelect value={slot.startTime} onChange={(startTime) => updateSlot(index, { startTime })} />
+                    <input
+                      type="number"
+                      min={1}
+                      value={slot.durationMinutes}
+                      onChange={(e) => updateSlot(index, { durationMinutes: Number(e.target.value) })}
+                      style={{ width: "4em" }}
+                      required
+                      aria-label="時長（分鐘）"
                     />
+                    分鐘
                     {sessionSlotValues.length > 1 && (
                       <button
                         type="button"
@@ -308,7 +360,11 @@ export default function GeneratePage() {
                     )}
                   </div>
                 ))}
-                <button type="button" className="button button-secondary" onClick={() => setSessionSlotValues([...sessionSlotValues, EMPTY_SLOT])}>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => setSessionSlotValues([...sessionSlotValues, makeEmptySlot(selectedTemplate?.variantLabel)])}
+                >
                   新增時段
                 </button>
               </fieldset>
@@ -330,8 +386,24 @@ export default function GeneratePage() {
           );
         })}
 
+        {selectedTemplate && (
+          <fieldset>
+            <legend>
+              心理師與個案 Email（{usesBcc(selectedTemplate.category) ? "將加入密件副本 BCC" : "將加入收件者"}）
+            </legend>
+            <label>
+              心理師 Email（選了心理師會自動帶入，可修改）
+              <input type="email" value={therapistEmail} onChange={(e) => setTherapistEmail(e.target.value)} />
+            </label>
+            <label>
+              個案 Email
+              <input type="email" value={caseEmail} onChange={(e) => setCaseEmail(e.target.value)} />
+            </label>
+          </fieldset>
+        )}
+
         <fieldset>
-          <legend>收件者（選填，可新增多筆）</legend>
+          <legend>其他收件者（選填，可新增多筆）</legend>
           {toEmails.map((email, index) => (
             <div key={index}>
               <input type="email" value={email} onChange={(e) => updateEmailList(toEmails, setToEmails, index, e.target.value)} />
@@ -348,7 +420,7 @@ export default function GeneratePage() {
         </fieldset>
 
         <fieldset>
-          <legend>密件副本 BCC（選填，可新增多筆）</legend>
+          <legend>其他密件副本 BCC（選填，可新增多筆）</legend>
           {bccEmails.map((email, index) => (
             <div key={index}>
               <input
