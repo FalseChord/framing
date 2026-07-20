@@ -17,6 +17,45 @@ interface Therapist {
   name: string;
 }
 
+const TIME_SELECT_HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"));
+const TIME_SELECT_MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
+
+function TimeSelect({ value, onChange }: { value: string; onChange: (time: string) => void }) {
+  const [hour, minute] = value.split(":");
+
+  return (
+    <>
+      <select
+        value={hour ?? ""}
+        onChange={(e) => onChange(`${e.target.value}:${minute ?? "00"}`)}
+        required
+        aria-label="時"
+      >
+        <option value="">時</option>
+        {TIME_SELECT_HOURS.map((h) => (
+          <option key={h} value={h}>
+            {h}
+          </option>
+        ))}
+      </select>
+      :
+      <select
+        value={minute ?? ""}
+        onChange={(e) => onChange(`${hour ?? "00"}:${e.target.value}`)}
+        required
+        aria-label="分"
+      >
+        <option value="">分</option>
+        {TIME_SELECT_MINUTES.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
+    </>
+  );
+}
+
 type DurationMode = "50" | "80" | "other";
 
 interface SlotFormState extends SessionSlotInput {
@@ -153,7 +192,10 @@ export default function GeneratePage() {
 
   async function handleCopyAndOpenGmail() {
     if (!result) return;
-    const htmlBlob = new Blob([result.html], { type: "text/html" });
+    // Wrapped with an explicit normal-size font so Gmail's paste handler doesn't
+    // fall back to an oversized default for unstyled pasted HTML.
+    const htmlForClipboard = `<span style="font-family:Arial,sans-serif;font-size:14px;">${result.html}</span>`;
+    const htmlBlob = new Blob([htmlForClipboard], { type: "text/html" });
     const textBlob = new Blob([result.plain], { type: "text/plain" });
     await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })]);
 
@@ -225,12 +267,9 @@ export default function GeneratePage() {
                   onChange={(e) => setSessionDateValue({ ...sessionDateValue, date: e.target.value })}
                   required
                 />
-                <input
-                  type="time"
-                  step={300}
+                <TimeSelect
                   value={sessionDateValue.startTime}
-                  onChange={(e) => setSessionDateValue({ ...sessionDateValue, startTime: e.target.value })}
-                  required
+                  onChange={(startTime) => setSessionDateValue({ ...sessionDateValue, startTime })}
                 />
                 <DurationPicker
                   slot={sessionDateValue}
@@ -246,12 +285,9 @@ export default function GeneratePage() {
                 {sessionSlotValues.map((slot, index) => (
                   <div key={index}>
                     <input type="date" value={slot.date} onChange={(e) => updateSlot(index, { date: e.target.value })} required />
-                    <input
-                      type="time"
-                      step={300}
+                    <TimeSelect
                       value={slot.startTime}
-                      onChange={(e) => updateSlot(index, { startTime: e.target.value })}
-                      required
+                      onChange={(startTime) => updateSlot(index, { startTime })}
                     />
                     <DurationPicker slot={slot} onChange={(patch) => updateSlot(index, patch)} />
                     {sessionSlotValues.length > 1 && (
