@@ -28,6 +28,9 @@ export default async function AppNav() {
         {session.name && (
           <span className={styles.identity}>
             目前操作者：{session.name}（{session.signature}）
+            <Link href="/select" className={styles.switchLink}>
+              切換操作者
+            </Link>
           </span>
         )}
       </div>
