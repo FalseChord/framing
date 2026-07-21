@@ -24,11 +24,16 @@ describe("toHighlightedHtml", () => {
     expect(toHighlightedHtml("A<B>C")).toBe('<span style="font-size:13px">A&lt;B&gt;C</span>');
   });
 
-  it("matches a highlighted span that itself contains a newline (e.g. multiple candidate slots)", () => {
+  it("makes a highlighted span that itself contains a newline (e.g. multiple candidate slots) a block, so trailing text starts on its own line instead of running into the last bullet", () => {
     const result = toHighlightedHtml("時段：**◉ 7/22 (三) 19:00-19:50\n◉ 7/24 (五) 20:00-20:50**，請確認");
     expect(result).toBe(
-      '<span style="font-size:13px">時段：<b style="background-color:#fff59d;font-size:13px">◉ 7/22 (三) 19:00-19:50<br>◉ 7/24 (五) 20:00-20:50</b>，請確認</span>'
+      '<span style="font-size:13px">時段：<b style="background-color:#fff59d;display:block;font-size:13px">◉ 7/22 (三) 19:00-19:50<br>◉ 7/24 (五) 20:00-20:50</b>，請確認</span>'
     );
+  });
+
+  it("does not add display:block to a single-line highlighted span (e.g. a bolded name)", () => {
+    const result = toHighlightedHtml("**王小明**");
+    expect(result).not.toContain("display:block");
   });
 
   it("sets font-size:13px directly on every <b> tag, not just the outer wrapper — matches Gmail's own measured Normal size (16px was measured wrong, 13px is Gmail's actual Normal)", () => {

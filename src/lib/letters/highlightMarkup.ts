@@ -21,11 +21,19 @@ const NORMAL_FONT_SIZE = "font-size:13px";
 export function toHighlightedHtml(text: string): string {
   const segments = text.split(HIGHLIGHT_PATTERN);
   const html = segments
-    .map((segment, index) =>
-      index % 2 === 1
-        ? `<b style="background-color:#fff59d;${NORMAL_FONT_SIZE}">${escapeHtml(segment)}</b>`
-        : escapeHtml(segment)
-    )
+    .map((segment, index) => {
+      if (index % 2 !== 1) {
+        return escapeHtml(segment);
+      }
+      // <b> is inline by default, so trailing text (e.g. "，是否方便...") would
+      // otherwise run onto the same line as the last bullet of a multi-slot
+      // list. display:block only for spans that are themselves multi-line
+      // (a bolded name like **王小明** stays inline, unaffected) forces
+      // trailing text onto its own line after the block, without altering
+      // the underlying text content.
+      const displayStyle = segment.includes("\n") ? "display:block;" : "";
+      return `<b style="background-color:#fff59d;${displayStyle}${NORMAL_FONT_SIZE}">${escapeHtml(segment)}</b>`;
+    })
     .join("");
   return `<span style="${NORMAL_FONT_SIZE}">${html.replace(/\n/g, "<br>")}</span>`;
 }
