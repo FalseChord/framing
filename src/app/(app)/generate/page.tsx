@@ -132,7 +132,7 @@ export default function GeneratePage() {
   const [therapistEmail, setTherapistEmail] = useState("");
   const [caseEmail, setCaseEmail] = useState("");
   const [includeLine, setIncludeLine] = useState(false);
-  const [result, setResult] = useState<{ subject: string; html: string; plain: string } | null>(null);
+  const [result, setResult] = useState<{ subject: string; html: string } | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -216,7 +216,7 @@ export default function GeneratePage() {
       }
       return;
     }
-    setResult({ subject: data.renderedSubject, html: data.renderedBodyHtml, plain: data.renderedBodyPlain });
+    setResult({ subject: data.renderedSubject, html: data.renderedBodyHtml });
   }
 
   async function handleCopyAndOpenGmail() {
@@ -231,10 +231,12 @@ export default function GeneratePage() {
       // result.html (toHighlightedHtml) already carries font-size:13px on every
       // element — Gmail's own measured "一般/Normal" size. This wrapper only adds
       // an email-safe font-family on top; it does not need to repeat font-size.
+      // Only text/html is written: Gmail's normal paste always prefers text/html
+      // over text/plain when both are present, so a plain-text fallback entry
+      // has no effect on what actually gets pasted into the opened draft.
       const htmlForClipboard = `<span style="font-family:Arial,sans-serif;">${result.html}</span>`;
       const htmlBlob = new Blob([htmlForClipboard], { type: "text/html" });
-      const textBlob = new Blob([result.plain], { type: "text/plain" });
-      await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })]);
+      await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob })]);
     } catch {
       setError("複製到剪貼簿失敗，請確認瀏覽器已允許本網站使用剪貼簿權限");
       return;
