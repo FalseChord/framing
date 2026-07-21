@@ -116,9 +116,26 @@ function makeEmptySlot(variantLabel: string | undefined): SlotFormState {
   return { date: "", startTime: "", durationMinutes: getDefaultDurationMinutes(variantLabel) };
 }
 
-// 媒合信用一般收件者，其他信件類別一律用密件副本 BCC，避免多位收件者互看到彼此的信箱。
+// 媒合信不用密件副本、也不寄給心理師（雙方本來就會互相聯繫），其他信件類別
+// 一律用密件副本 BCC 寄給心理師與個案，避免多位收件者互看到彼此的信箱。
+// 這兩件事目前剛好是同一個條件，所以共用同一個函式。
 function usesBcc(category: string | undefined): boolean {
   return category !== undefined && category !== "媒合信";
+}
+
+// 方案的顯示順序：一般 / 伴侶‧家庭 / 青壯 / 重大災害 / 公益 / EAP（EAP 放最後）。
+// 不在清單中的方案名稱排在後面。
+const VARIANT_ORDER = ["一般", "伴侶/家庭", "青壯", "重大災害", "公益", "EAP"];
+
+function sortVariants(items: TemplateItem[]): TemplateItem[] {
+  return [...items].sort((a, b) => {
+    const ai = VARIANT_ORDER.indexOf(a.variantLabel);
+    const bi = VARIANT_ORDER.indexOf(b.variantLabel);
+    if (ai === -1 && bi === -1) return a.variantLabel.localeCompare(b.variantLabel, "zh-Hant");
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
 }
 
 export default function GeneratePage() {
@@ -141,9 +158,10 @@ export default function GeneratePage() {
   }, []);
 
   const categories = Array.from(new Set(templates.map((t) => t.category))).sort();
-  const categoryVariants = templates.filter((t) => t.category === category);
+  const categoryVariants = sortVariants(templates.filter((t) => t.category === category));
   const showVariantPicker = categoryVariants.length > 1;
   const selectedTemplate = templates.find((t) => t.id === templateId);
+  const showsTherapistEmail = usesBcc(selectedTemplate?.category);
 
   // 選了心理師後，自動從資料庫帶入該心理師的 Email（操作者仍可手動修改/覆寫）。
   useEffect(() => {
@@ -185,7 +203,17 @@ export default function GeneratePage() {
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (!selectedTemplate) return;
+    if (!selectedTemplate) {
+      setError("請先選擇信件類別與方案");
+      return;
+    }
+    if (
+      selectedTemplate.requiredFields.includes("therapistName") &&
+      !therapists.some((t) => t.name === textFields.therapistName)
+    ) {
+      setError("請從清單中選擇一位心理師");
+      return;
+    }
 
     const fields: Record<string, string> = { ...textFields };
     let slotCount: number | undefined;
@@ -221,11 +249,30 @@ export default function GeneratePage() {
 
   async function handleCopyAndOpenGmail() {
     if (!result) return;
-    if (!therapistEmail.trim() || !caseEmail.trim()) {
-      setError("請先填寫心理師與個案的 Email，才能開啟 Gmail 草稿");
+
+    const missing: string[] = [];
+    if (showsTherapistEmail && !therapistEmail.trim()) missing.push("心理師 Email");
+    if (!caseEmail.trim()) missing.push("個案 Email");
+    if (missing.length > 0) {
+      setError(`請先填寫${missing.join("、")}，才能開啟 Gmail 草稿`);
       return;
     }
     setError("");
+
+    const recipientEmails = [showsTherapistEmail ? therapistEmail : "", caseEmail].filter((e) => e.trim());
+    const routeToBcc = usesBcc(selectedTemplate?.category);
+    const url = buildGmailComposeUrl({
+      to: (routeToBcc ? [] : recipientEmails).join(","),
+      bcc: (routeToBcc ? recipientEmails : []).join(","),
+      subject: result.subject,
+    });
+
+    // window.open must run synchronously within the click handler — some browsers
+    // (notably Safari) only treat window.open as user-initiated if there is no
+    // `await` before it. Awaiting the clipboard write first (as this used to do)
+    // breaks that chain and causes the popup to open blank / get blocked, which is
+    // why the compose draft used to show up without the recipient/subject.
+    window.open(url, "_blank");
 
     try {
       // result.html (toHighlightedHtml) already carries font-size:13px on every
@@ -239,18 +286,7 @@ export default function GeneratePage() {
       await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob })]);
     } catch {
       setError("複製到剪貼簿失敗，請確認瀏覽器已允許本網站使用剪貼簿權限");
-      return;
     }
-
-    const recipientEmails = [therapistEmail, caseEmail].filter((e) => e.trim());
-    const routeToBcc = usesBcc(selectedTemplate?.category);
-
-    const url = buildGmailComposeUrl({
-      to: (routeToBcc ? [] : recipientEmails).join(","),
-      bcc: (routeToBcc ? recipientEmails : []).join(","),
-      subject: result.subject,
-    });
-    window.open(url, "_blank");
   }
 
   return (
@@ -288,18 +324,18 @@ export default function GeneratePage() {
             return (
               <label key={fieldName}>
                 心理師
-                <select
+                <input
+                  list="therapist-options"
                   value={textFields.therapistName ?? ""}
                   onChange={(e) => setTextField("therapistName", e.target.value)}
+                  placeholder="輸入姓名以篩選"
                   required
-                >
-                  <option value="">請選擇</option>
+                />
+                <datalist id="therapist-options">
                   {therapists.map((t) => (
-                    <option key={t.id} value={t.name}>
-                      {t.name}
-                    </option>
+                    <option key={t.id} value={t.name} />
                   ))}
-                </select>
+                </datalist>
               </label>
             );
           }
@@ -395,12 +431,15 @@ export default function GeneratePage() {
         {selectedTemplate && (
           <fieldset>
             <legend>
-              心理師與個案 Email（{usesBcc(selectedTemplate.category) ? "將加入密件副本 BCC" : "將加入收件者"}）
+              {showsTherapistEmail ? "心理師與個案 Email" : "個案 Email"}
+              （{usesBcc(selectedTemplate.category) ? "將加入密件副本 BCC" : "將加入收件者"}）
             </legend>
-            <label>
-              心理師 Email（選了心理師會自動帶入，可修改）
-              <input type="email" value={therapistEmail} onChange={(e) => setTherapistEmail(e.target.value)} />
-            </label>
+            {showsTherapistEmail && (
+              <label>
+                心理師 Email（選了心理師會自動帶入，可修改）
+                <input type="email" value={therapistEmail} onChange={(e) => setTherapistEmail(e.target.value)} />
+              </label>
+            )}
             <label>
               個案 Email
               <input type="email" value={caseEmail} onChange={(e) => setCaseEmail(e.target.value)} />
@@ -414,7 +453,7 @@ export default function GeneratePage() {
         </label>
 
         {error && <p role="alert">{error}</p>}
-        <button type="submit" className="button button-primary" disabled={!templateId}>
+        <button type="submit" className="button button-primary">
           產生信件
         </button>
       </form>
@@ -422,6 +461,10 @@ export default function GeneratePage() {
         <section>
           <h2>產出結果</h2>
           <p>主旨：{result.subject}</p>
+          <p>
+            {usesBcc(selectedTemplate?.category) ? "密件副本 BCC" : "收件者"}：
+            {[showsTherapistEmail ? therapistEmail : "", caseEmail].filter((e) => e.trim()).join("、") || "（尚未填寫）"}
+          </p>
           <div dangerouslySetInnerHTML={{ __html: result.html }} />
           <button className="button button-primary" onClick={handleCopyAndOpenGmail}>
             複製格式化內文並開啟 Gmail 草稿
