@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import flatpickr from "flatpickr";
+import { MandarinTraditional } from "flatpickr/dist/l10n/zh-tw.js";
+import "flatpickr/dist/flatpickr.min.css";
 import { buildGmailComposeUrl } from "@/lib/letters/gmailUrl";
 import { formatSessionSlot, formatSessionSlots } from "@/lib/letters/dateFormat";
 
@@ -28,46 +31,62 @@ const FIELD_LABELS: Record<string, string> = {
   meetLink: "視訊連結",
 };
 
-function padTimePart(v: string, max: number): string {
-  const n = parseInt(v, 10);
-  return Number.isNaN(n) ? "" : String(Math.min(Math.max(n, 0), max)).padStart(2, "0");
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
 }
 
-// Plain number inputs — no dropdown, no autocomplete/filter behavior to fight.
-// The operator can type any hour/minute directly; padded to two digits on blur.
-function TimeSelect({ value, onChange }: { value: string; onChange: (time: string) => void }) {
-  const [hour, minute] = value.split(":");
+// Single flatpickr-backed input covering both date and time in one calendar
+// popup (calendar grid + scrollable time spinner), replacing the previous
+// separate <input type="date"> + two number inputs. The input itself is
+// read-only — selection only happens through the calendar UI.
+function DateTimePicker({
+  date,
+  startTime,
+  onChange,
+}: {
+  date: string;
+  startTime: string;
+  onChange: (patch: { date: string; startTime: string }) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const fpRef = useRef<flatpickr.Instance | null>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
-  return (
-    <>
-      <input
-        type="number"
-        min={0}
-        max={23}
-        value={hour ?? ""}
-        onChange={(e) => onChange(`${e.target.value}:${minute ?? "00"}`)}
-        onBlur={(e) => onChange(`${padTimePart(e.target.value, 23)}:${minute ?? "00"}`)}
-        placeholder="時"
-        style={{ width: "4em" }}
-        required
-        aria-label="時"
-      />
-      :
-      <input
-        type="number"
-        min={0}
-        max={59}
-        step={5}
-        value={minute ?? ""}
-        onChange={(e) => onChange(`${hour ?? "00"}:${e.target.value}`)}
-        onBlur={(e) => onChange(`${hour ?? "00"}:${padTimePart(e.target.value, 59)}`)}
-        placeholder="分"
-        style={{ width: "4em" }}
-        required
-        aria-label="分"
-      />
-    </>
-  );
+  useEffect(() => {
+    if (!inputRef.current) return;
+    const fp = flatpickr(inputRef.current, {
+      enableTime: true,
+      time_24hr: true,
+      minuteIncrement: 5,
+      dateFormat: "Y-m-d H:i",
+      locale: MandarinTraditional,
+      onChange: (selectedDates) => {
+        const picked = selectedDates[0];
+        if (!picked) return;
+        onChangeRef.current({
+          date: `${picked.getFullYear()}-${pad2(picked.getMonth() + 1)}-${pad2(picked.getDate())}`,
+          startTime: `${pad2(picked.getHours())}:${pad2(picked.getMinutes())}`,
+        });
+      },
+    });
+    fpRef.current = fp;
+    return () => fp.destroy();
+  }, []);
+
+  // Keep the widget in sync when the parent resets/changes the value
+  // programmatically (e.g. switching template variant).
+  useEffect(() => {
+    const fp = fpRef.current;
+    if (!fp) return;
+    if (date && startTime) {
+      fp.setDate(`${date} ${startTime}`, false);
+    } else {
+      fp.clear(false);
+    }
+  }, [date, startTime]);
+
+  return <input ref={inputRef} type="text" readOnly placeholder="點擊選擇日期與時間" required aria-label="日期與時間" />;
 }
 
 function CaseRefPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -344,15 +363,10 @@ export default function GeneratePage() {
               <fieldset key={fieldName}>
                 <legend>日期時段</legend>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <input
-                    type="date"
-                    value={sessionDateValue.date}
-                    onChange={(e) => setSessionDateValue({ ...sessionDateValue, date: e.target.value })}
-                    required
-                  />
-                  <TimeSelect
-                    value={sessionDateValue.startTime}
-                    onChange={(startTime) => setSessionDateValue({ ...sessionDateValue, startTime })}
+                  <DateTimePicker
+                    date={sessionDateValue.date}
+                    startTime={sessionDateValue.startTime}
+                    onChange={(patch) => setSessionDateValue({ ...sessionDateValue, ...patch })}
                   />
                   <input
                     type="number"
@@ -379,8 +393,11 @@ export default function GeneratePage() {
                     key={index}
                     style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}
                   >
-                    <input type="date" value={slot.date} onChange={(e) => updateSlot(index, { date: e.target.value })} required />
-                    <TimeSelect value={slot.startTime} onChange={(startTime) => updateSlot(index, { startTime })} />
+                    <DateTimePicker
+                      date={slot.date}
+                      startTime={slot.startTime}
+                      onChange={(patch) => updateSlot(index, patch)}
+                    />
                     <input
                       type="number"
                       min={1}
