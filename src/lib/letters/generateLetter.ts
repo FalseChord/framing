@@ -47,7 +47,11 @@ export function generateLetter(input: GenerateLetterInput): GeneratedLetter {
     operatorSignature: input.operatorSignature,
     includeLine: input.includeLine,
   });
-  const fullBody = `${renderedBody}\n\n${signatureBlock}`;
+  // Every greeting starts with the case name ("{{caseRef}}，您好：" /
+  // "{{caseRef}} 您好，"); when it is left blank, drop the separator it leaves
+  // behind so the letter opens with "您好" instead of "，您好".
+  const greetingFixedBody = renderedBody.replace(/^[\s，,、]+/, "");
+  const fullBody = `${greetingFixedBody}\n\n${signatureBlock}`;
 
   return {
     renderedSubject: stripHighlightMarkers(renderedSubject),

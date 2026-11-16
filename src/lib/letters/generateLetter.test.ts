@@ -42,4 +42,19 @@ describe("generateLetter", () => {
       })
     ).toThrowError(MissingFieldsError);
   });
+
+  it("drops the separator left at the start when an optional case name is blank", () => {
+    const result = generateLetter({
+      template: {
+        subject: "通知",
+        body: "{{caseRef}}，您好：\n內文",
+        requiredFields: ["caseRef"],
+        optionalFields: ["caseRef"],
+      },
+      fields: { caseRef: "" },
+      includeLine: false,
+      operatorSignature: "S01",
+    });
+    expect(result.renderedBodyPlain.startsWith("您好：\n內文")).toBe(true);
+  });
 });

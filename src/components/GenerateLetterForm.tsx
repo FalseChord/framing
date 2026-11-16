@@ -136,7 +136,15 @@ function RadioGroup({
   );
 }
 
-function CaseRefPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function CaseRefPicker({
+  value,
+  onChange,
+  optional,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  optional: boolean;
+}) {
   const [fullName, setFullName] = useState("");
   const surname = fullName.slice(0, 1);
   const givenName = fullName.slice(1);
@@ -163,7 +171,7 @@ function CaseRefPicker({ value, onChange }: { value: string; onChange: (v: strin
             name="caseRefOption"
             checked={value === opt}
             onChange={() => onChange(opt)}
-            required
+            required={!optional}
             style={{ display: "inline-block", width: "auto", marginRight: "4px" }}
           />
           {opt}
@@ -495,8 +503,12 @@ export default function GenerateLetterForm({
           if (fieldName === "caseRef") {
             return (
               <fieldset key={fieldName}>
-                <legend>個案稱呼</legend>
-                <CaseRefPicker value={textFields.caseRef ?? ""} onChange={(v) => setTextField("caseRef", v)} />
+                <legend>個案稱呼{selectedTemplate.optionalFields.includes("caseRef") && "（選填）"}</legend>
+                <CaseRefPicker
+                  value={textFields.caseRef ?? ""}
+                  onChange={(v) => setTextField("caseRef", v)}
+                  optional={selectedTemplate.optionalFields.includes("caseRef")}
+                />
               </fieldset>
             );
           }
