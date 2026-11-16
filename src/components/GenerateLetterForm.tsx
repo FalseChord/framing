@@ -103,6 +103,39 @@ function DateTimePicker({
   return <input ref={inputRef} type="text" readOnly placeholder="點擊選擇日期與時間" required aria-label="日期與時間" />;
 }
 
+// All options visible at once (one click to choose, easy to scan) instead of a
+// <select> that needs a click to open and another to pick.
+function RadioGroup({
+  name,
+  options,
+  value,
+  onChange,
+}: {
+  name: string;
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px" }}>
+      {options.map((opt) => (
+        <label key={opt.value} style={{ display: "inline-flex", alignItems: "center", width: "auto", fontWeight: "normal", margin: 0 }}>
+          <input
+            type="radio"
+            name={name}
+            value={opt.value}
+            checked={value === opt.value}
+            onChange={() => onChange(opt.value)}
+            required
+            style={{ display: "inline-block", width: "auto", margin: "0 4px 0 0" }}
+          />
+          {opt.label}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 function CaseRefPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [fullName, setFullName] = useState("");
   const surname = fullName.slice(0, 1);
@@ -336,30 +369,26 @@ export default function GenerateLetterForm({
     <main>
       <h1>產生信件</h1>
       <form onSubmit={handleGenerate}>
-        <label>
-          信件類別
-          <select value={category} onChange={(e) => handleCategoryChange(e.target.value)} required>
-            <option value="">請選擇</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
+        <fieldset>
+          <legend>信件類別</legend>
+          <RadioGroup
+            name="category"
+            options={categories.map((c) => ({ value: c, label: c }))}
+            value={category}
+            onChange={handleCategoryChange}
+          />
+        </fieldset>
 
         {showVariantPicker && (
-          <label>
-            方案
-            <select value={templateId} onChange={(e) => handleVariantChange(e.target.value)} required>
-              <option value="">請選擇</option>
-              {categoryVariants.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.variantLabel}
-                </option>
-              ))}
-            </select>
-          </label>
+          <fieldset>
+            <legend>方案</legend>
+            <RadioGroup
+              name="variant"
+              options={categoryVariants.map((t) => ({ value: t.id, label: t.variantLabel }))}
+              value={templateId}
+              onChange={handleVariantChange}
+            />
+          </fieldset>
         )}
 
         {selectedTemplate?.requiredFields.map((fieldName) => {
