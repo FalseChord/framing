@@ -1,12 +1,14 @@
-import { StrictMode, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "@/app/globals.css";
 import navStyles from "@/components/AppNav.module.css";
 import GenerateLetterForm, { type GenerateOutcome, type GenerateRequest } from "@/components/GenerateLetterForm";
+import TemplateManager from "@/components/TemplateManager";
 import { generateLetter } from "@/lib/letters/generateLetter";
 import { MissingFieldsError } from "@/lib/letters/render";
 import rawData from "./letters-data.json";
-import type { StaticLettersData, StaticOperator } from "./data";
+import type { StaticLettersData, StaticOperator, StaticTemplate } from "./data";
+import { OPERATOR_HEADER } from "../lib/templateApi";
 
 const data = rawData as StaticLettersData;
 
@@ -59,23 +61,24 @@ function SelectOperator({ onSelect }: { onSelect: (operator: StaticOperator) => 
   );
 }
 
-function App() {
-  const [operator, setOperator] = useState<StaticOperator | null>(loadOperator);
+// Fetched on every mount, so switching back from 模板管理 picks up edits.
+function GeneratePanel({ operator }: { operator: StaticOperator }) {
+  const [templates, setTemplates] = useState<StaticTemplate[]>([]);
+  const [loadError, setLoadError] = useState("");
 
-  if (!operator) {
-    return (
-      <SelectOperator
-        onSelect={(o) => {
-          saveOperator(o.id);
-          setOperator(o);
-        }}
-      />
-    );
-  }
+  useEffect(() => {
+    fetch("/api/templates")
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
+      .then(setTemplates)
+      .catch(() => setLoadError("模板載入失敗，請重新整理頁面"));
+  }, []);
 
   async function generate(request: GenerateRequest): Promise<GenerateOutcome> {
-    const template = data.templates.find((t) => t.id === request.templateId);
-    if (!template || !operator) {
+    const template = templates.find((t) => t.id === request.templateId);
+    if (!template) {
       return { ok: false, error: "找不到模板" };
     }
     try {
@@ -97,10 +100,61 @@ function App() {
 
   return (
     <>
+      {loadError && <p role="alert">{loadError}</p>}
+      <GenerateLetterForm templates={templates} therapists={data.therapists} generate={generate} />
+      <p style={{ color: "var(--color-text-muted)", fontSize: "0.85rem" }}>
+        心理師／操作者名單更新時間：{new Date(data.exportedAt).toLocaleString("zh-TW")}
+      </p>
+    </>
+  );
+}
+
+type View = "generate" | "templates";
+
+function readView(): View {
+  return window.location.hash === "#templates" ? "templates" : "generate";
+}
+
+function App() {
+  const [operator, setOperator] = useState<StaticOperator | null>(loadOperator);
+  const [view, setView] = useState<View>(readView);
+
+  useEffect(() => {
+    const onHashChange = () => setView(readView());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  if (!operator) {
+    return (
+      <SelectOperator
+        onSelect={(o) => {
+          saveOperator(o.id);
+          setOperator(o);
+        }}
+      />
+    );
+  }
+
+  const linkStyle = (active: boolean) => ({
+    color: active ? "var(--color-accent-strong)" : undefined,
+    fontWeight: active ? 700 : undefined,
+  });
+
+  return (
+    <>
       <header className={navStyles.nav}>
         <div className={navStyles.navInner}>
           <span className={navStyles.brand}>信件模板系統</span>
-          <span className={navStyles.identity} style={{ marginLeft: "auto" }}>
+          <nav className={navStyles.links}>
+            <a href="#generate" className={navStyles.link} style={linkStyle(view === "generate")}>
+              產生信件
+            </a>
+            <a href="#templates" className={navStyles.link} style={linkStyle(view === "templates")}>
+              模板管理
+            </a>
+          </nav>
+          <span className={navStyles.identity}>
             目前操作者：{operator.name}（{operator.signature}）
             <button
               type="button"
@@ -117,10 +171,11 @@ function App() {
         </div>
       </header>
       <div className="page-container">
-        <GenerateLetterForm templates={data.templates} therapists={data.therapists} generate={generate} />
-        <p style={{ color: "var(--color-text-muted)", fontSize: "0.85rem" }}>
-          模板資料更新時間：{new Date(data.exportedAt).toLocaleString("zh-TW")}
-        </p>
+        {view === "templates" ? (
+          <TemplateManager requestHeaders={{ [OPERATOR_HEADER]: encodeURIComponent(operator.name) }} />
+        ) : (
+          <GeneratePanel operator={operator} />
+        )}
       </div>
     </>
   );

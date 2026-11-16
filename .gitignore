@@ -9,4 +9,5 @@ next-env.d.ts
 static/dist/
 static/src/letters-data.json
 static/.dev.vars
+static/.seed-templates.sql
 .wrangler/

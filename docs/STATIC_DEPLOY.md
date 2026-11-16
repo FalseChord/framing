@@ -7,8 +7,9 @@
 | | 完整版（`npm run dev` / Docker） | 靜態版（`static/`） |
 |---|---|---|
 | 產生信件 | ✓ | ✓（同一份 `GenerateLetterForm` 元件與 `generateLetter()` 邏輯） |
-| 編輯模板／心理師／操作者 | ✓ | ✗ ——只能在你自己電腦上的完整版改，改完重新發布 |
-| 資料來源 | SQLite（`prisma/dev.db`） | 建置時從 `dev.db` 匯出的快照（`static/src/letters-data.json`，不進 git） |
+| 編輯模板 | ✓（僅供開發測試，見下方） | ✓ ——線上「模板管理」頁，存檔即生效，資料存在 Cloudflare D1 |
+| 編輯心理師／操作者 | ✓ | ✗ ——在你自己電腦上的完整版改，改完重新發布（一年個位數次） |
+| 資料來源 | SQLite（`prisma/dev.db`） | 模板：D1（線上為準）；心理師／操作者：建置時從 `dev.db` 匯出的快照（`static/src/letters-data.json`，不進 git） |
 | 操作者身分 | iron-session cookie | 記在各自瀏覽器的 localStorage |
 | 存取保護 | 僅限內網 | 全診所共用一組密碼（HTTP Basic Auth，由 `static/worker.ts` 在 Cloudflare 端檢查，網頁與資料檔都擋） |
 
@@ -50,6 +51,24 @@ npm run deploy:static
 ## 換密碼（例如有人離職）
 
 在後台同一個位置修改 `SITE_PASSWORD`，存檔即生效。
+
+## 模板以線上（D1）為準
+
+2026-11-16 起，模板改在線上「模板管理」頁編輯，資料存在 D1（`framing-letters`，亞太區），**以線上為準**：
+
+- 本機完整版（`npm run dev`）的模板管理頁改的是 `dev.db`，**不會**同步到線上，只能拿來開發測試，不要用它改正式模板。
+- `npm run deploy:static` 不再匯出模板，只匯出心理師與操作者。
+- 記錄的「修改者」是當下選的操作者名字（線上版沒有登入工作階段）。
+- 尚未做：刪除模板、把線上模板轉回 `dev.db` 的指令（等 NAS 上線時再寫）。
+
+資料表結構在 `static/migrations/`。相關指令（一次性，已於 2026-11-16 執行過）：
+
+```bash
+npm run db:migrate:static    # 在線上 D1 建立／更新資料表
+npm run seed:d1-templates    # 把 dev.db 的模板匯入 D1（已存在的不覆蓋）
+```
+
+之後如果新增 migration，部署前先跑 `npm run db:migrate:static`。
 
 ## 已知限制
 

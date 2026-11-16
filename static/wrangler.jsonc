@@ -10,6 +10,16 @@
     // template/therapist data) would be served without passing the password check.
     "run_worker_first": true
   },
+  // Online source of truth for templates (therapists/operators stay a build-time
+  // export of dev.db). Schema: static/migrations/.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "framing-letters",
+      "database_id": "34f81c02-8ca0-4fae-ab77-07dc1604a9a8",
+      "migrations_dir": "migrations"
+    }
+  ],
   "workers_dev": true,
   "preview_urls": false
 }
