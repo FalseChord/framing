@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import styles from "./TemplateManager.module.css";
 
 interface TemplateItem {
   id: string;
@@ -50,6 +51,7 @@ export default function TemplateManager({ requestHeaders = {} }: { requestHeader
   const [form, setForm] = useState<FormState | null>(null);
   const [warning, setWarning] = useState<string[]>([]);
   const [error, setError] = useState("");
+  const [savedMessage, setSavedMessage] = useState("");
 
   async function load() {
     const res = await fetch("/api/templates");
@@ -63,6 +65,7 @@ export default function TemplateManager({ requestHeaders = {} }: { requestHeader
   const categories = Array.from(new Set(templates.map((t) => t.category))).sort();
 
   function startEdit(t: TemplateItem) {
+    setSavedMessage("");
     setForm({
       id: t.id,
       category: t.category,
@@ -78,18 +81,21 @@ export default function TemplateManager({ requestHeaders = {} }: { requestHeader
   }
 
   function startNewVariant(category: string) {
+    setSavedMessage("");
     setForm({ ...EMPTY_FORM, category, categoryLocked: true });
     setWarning([]);
     setError("");
   }
 
   function startNewCategory() {
+    setSavedMessage("");
     setForm({ ...EMPTY_FORM });
     setWarning([]);
     setError("");
   }
 
   function cancelEdit() {
+    setSavedMessage("");
     setForm(null);
     setWarning([]);
     setError("");
@@ -123,109 +129,128 @@ export default function TemplateManager({ requestHeaders = {} }: { requestHeader
       setError(data.error);
       return;
     }
-    setWarning(data.undeclaredFields ?? []);
-    setForm(null);
     await load();
+    // Stay on the template just saved (it stays highlighted in the sidebar).
+    if (data.template) {
+      startEdit(data.template);
+    }
+    setWarning(data.undeclaredFields ?? []);
+    setSavedMessage("✓ 已儲存");
   }
+
+  const isNewVariantFor = (category: string) =>
+    form !== null && form.id === null && form.categoryLocked && form.category === category;
+  const isNewCategory = form !== null && form.id === null && !form.categoryLocked;
+  const itemClass = (active: boolean) => `${styles.item}${active ? ` ${styles.itemActive}` : ""}`;
 
   return (
     <main>
       <h1>模板管理</h1>
-      <button type="button" className="button button-primary" onClick={startNewCategory}>
-        ＋ 新增類別
-      </button>
-
-      {categories.map((category) => {
-        const variants = templates.filter((t) => t.category === category);
-        return (
-          <details key={category}>
-            <summary>
-              {category}（{variants.length} 個變體）
-            </summary>
-            <ul className="list">
-              {variants.map((t) => (
-                <li key={t.id}>
-                  <span>{t.variantLabel}</span>
-                  <button type="button" className="button button-secondary" onClick={() => startEdit(t)}>
-                    編輯
+      <div className={styles.layout}>
+        <nav className={styles.sidebar} aria-label="模板清單">
+          <button type="button" className={itemClass(isNewCategory)} onClick={startNewCategory}>
+            ＋ 新增類別
+          </button>
+          {categories.map((category) => (
+            <div key={category}>
+              <div className={styles.categoryName}>{category}</div>
+              {templates
+                .filter((t) => t.category === category)
+                .map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={itemClass(form?.id === t.id)}
+                    aria-current={form?.id === t.id ? "true" : undefined}
+                    onClick={() => startEdit(t)}
+                  >
+                    {t.variantLabel}
                   </button>
-                </li>
-              ))}
-            </ul>
-            <button type="button" className="button button-secondary" onClick={() => startNewVariant(category)}>
-              ＋ 新增變體
-            </button>
-          </details>
-        );
-      })}
+                ))}
+              <button
+                type="button"
+                className={`${itemClass(isNewVariantFor(category))} ${styles.addItem}`}
+                onClick={() => startNewVariant(category)}
+              >
+                ＋ 新增變體
+              </button>
+            </div>
+          ))}
+        </nav>
 
-      {form && (
-        <form onSubmit={handleSubmit} style={{ marginTop: "24px" }}>
-          <h2>{form.id ? "編輯變體" : "新增變體"}</h2>
-          <label>
-            類別
-            <input
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-              disabled={form.categoryLocked}
-              required
-            />
-          </label>
-          <label>
-            變體名稱（無方案差異就填「不適用」）
-            <input
-              value={form.variantLabel}
-              onChange={(e) => setForm({ ...form, variantLabel: e.target.value })}
-              required
-            />
-          </label>
-          <label>
-            標題
-            <input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} required />
-          </label>
-          <label>
-            內文
-            <textarea
-              value={form.body}
-              onChange={(e) => setForm({ ...form, body: e.target.value })}
-              required
-              rows={26}
-              style={{ fontFamily: "var(--font-mono)" }}
-            />
-          </label>
-          <p>
-            語法提示：
-            <br />
-            多時段差異：<code>[單一時段]...[/單一時段]</code>、<code>[多個時段]...[/多個時段]</code>
-            <br />
-            粗體＋淺黃底色：<code>**文字**</code>
-          </p>
-          <label>
-            必填欄位（用逗號分隔，例如：caseRef, therapistName, sessionDate）
-            <input
-              value={form.requiredFieldsText}
-              onChange={(e) => setForm({ ...form, requiredFieldsText: e.target.value })}
-            />
-          </label>
-          <label>
-            其中可留空的選填欄位（用逗號分隔，必須也列在上一欄，例如：meetLink；沒填時信中留空）
-            <input
-              value={form.optionalFieldsText}
-              onChange={(e) => setForm({ ...form, optionalFieldsText: e.target.value })}
-            />
-          </label>
-          {error && <p role="alert">{error}</p>}
-          <button type="submit" className="button button-primary">
-            {form.id ? "儲存修改" : "新增變體"}
-          </button>
-          <button type="button" className="button button-secondary" onClick={cancelEdit}>
-            取消
-          </button>
-        </form>
-      )}
-      {warning.length > 0 && (
-        <p role="alert">注意：內文引用了未宣告的欄位（{warning.join("、")}），請確認拼字是否正確。</p>
-      )}
+        <section>
+          {warning.length > 0 && (
+            <p role="alert">注意：內文引用了未宣告的欄位（{warning.join("、")}），請確認拼字是否正確。</p>
+          )}
+          {form ? (
+            <form onSubmit={handleSubmit}>
+              <h2>{form.id ? "編輯變體" : "新增變體"}</h2>
+              <label>
+                類別
+                <input
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  disabled={form.categoryLocked}
+                  required
+                />
+              </label>
+              <label>
+                變體名稱（無方案差異就填「不適用」）
+                <input
+                  value={form.variantLabel}
+                  onChange={(e) => setForm({ ...form, variantLabel: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                標題
+                <input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} required />
+              </label>
+              <label>
+                內文
+                <textarea
+                  value={form.body}
+                  onChange={(e) => setForm({ ...form, body: e.target.value })}
+                  required
+                  rows={26}
+                  style={{ fontFamily: "var(--font-mono)" }}
+                />
+              </label>
+              <p>
+                語法提示：
+                <br />
+                多時段差異：<code>[單一時段]...[/單一時段]</code>、<code>[多個時段]...[/多個時段]</code>
+                <br />
+                粗體＋淺黃底色：<code>**文字**</code>
+              </p>
+              <label>
+                必填欄位（用逗號分隔，例如：caseRef, therapistName, sessionDate）
+                <input
+                  value={form.requiredFieldsText}
+                  onChange={(e) => setForm({ ...form, requiredFieldsText: e.target.value })}
+                />
+              </label>
+              <label>
+                其中可留空的選填欄位（用逗號分隔，必須也列在上一欄，例如：meetLink；沒填時信中留空）
+                <input
+                  value={form.optionalFieldsText}
+                  onChange={(e) => setForm({ ...form, optionalFieldsText: e.target.value })}
+                />
+              </label>
+              {error && <p role="alert">{error}</p>}
+              {savedMessage && <p>{savedMessage}</p>}
+              <button type="submit" className="button button-primary">
+                {form.id ? "儲存修改" : "新增變體"}
+              </button>
+              <button type="button" className="button button-secondary" onClick={cancelEdit}>
+                取消
+              </button>
+            </form>
+          ) : (
+            <p className={styles.placeholder}>請從左側選擇要編輯的模板，或新增類別／變體。</p>
+          )}
+        </section>
+      </div>
     </main>
   );
 }
