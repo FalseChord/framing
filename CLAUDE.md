@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Language
+
+**Always reply to the user in Traditional Chinese (繁體中文)** — every message, including status updates, explanations, and questions, even mid-task or after long tool output. Code, identifiers, commit messages, and code comments stay in English as they are now. The user has had to ask for Chinese more than once after replies drifted into English; don't let it happen again.
+
 ## What this is
 
 A Next.js admin tool for a counseling clinic (加惠心理諮商) that replaces manual copy-paste letter drafting. Single Next.js project (App Router) serving both UI and API routes, backed by a single-file SQLite database via Prisma. Deployment target is a Docker container on a self-hosted NAS on the clinic's own LAN (see `docs/NAS_SETUP.md`), not a public-facing server — no internet exposure, single trusted internal network. (An earlier plan targeted a bare Windows machine instead; superseded 2026-09-15 in favor of the NAS/Docker approach for always-on availability and native snapshot-based backups — see `docs/NAS_SETUP.md` for the reasoning.) This shapes several deliberate architectural choices below.
