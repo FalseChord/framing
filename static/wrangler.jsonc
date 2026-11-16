@@ -1,0 +1,15 @@
+// Static letter generator deployed as a Worker with static assets — see docs/STATIC_DEPLOY.md.
+{
+  "name": "framing-letters",
+  "main": "worker.ts",
+  "compatibility_date": "2025-11-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    // Without this, asset requests (including the JS bundle that embeds the
+    // template/therapist data) would be served without passing the password check.
+    "run_worker_first": true
+  },
+  "workers_dev": true,
+  "preview_urls": false
+}

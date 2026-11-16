@@ -14,5 +14,5 @@
     "types": ["vite/client"],
     "paths": { "@/*": ["../src/*"] }
   },
-  "include": ["src", "lib", "functions", "vite.config.ts"]
+  "include": ["src", "lib", "worker.ts", "vite.config.ts"]
 }

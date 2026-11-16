@@ -1,6 +1,6 @@
 // Checks an HTTP Basic `Authorization` header against the one shared site
 // password. The username part is ignored — staff only need the password.
-// Lives outside functions/ because every file there becomes a Pages route.
+// Kept separate from worker.ts so it can be unit-tested without the Workers runtime.
 export function isAuthorized(authorizationHeader: string | null, expectedPassword: string): boolean {
   if (!expectedPassword || !authorizationHeader?.startsWith("Basic ")) {
     return false;

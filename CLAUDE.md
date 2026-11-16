@@ -21,7 +21,7 @@ npx prisma db seed                     # run prisma/seed.ts (synthetic data, ide
 npx prisma studio                      # browser-based DB viewer/editor, used for local data setup
 
 npm run build:static    # export dev.db → static/src/letters-data.json, then build the static letter generator into static/dist
-npm run deploy:static   # build:static + upload to Cloudflare Pages (see docs/STATIC_DEPLOY.md)
+npm run deploy:static   # build:static + deploy as a Cloudflare Worker with static assets (see docs/STATIC_DEPLOY.md)
 ```
 
 ### `prisma generate` path-baking hazard — verify after every run
@@ -51,7 +51,7 @@ The one exception is the interim static build (below): because it is reachable f
 
 ### Interim static build (`static/`)
 
-Until a real host (NAS) exists, the letter generator alone is deployed as a static site on Cloudflare Pages — see `docs/STATIC_DEPLOY.md`. It is a small Vite app that reuses the full app's code through the same `@/` alias: `src/components/GenerateLetterForm.tsx` (the form, data-source agnostic — it receives `templates`, `therapists`, and a `generate` callback) and `src/lib/letters/generateLetter.ts` (the subject+body+signature pipeline, also used by `/api/letters/generate`). Keep letter logic in those two shared places; never fork it into `static/`. Data is a build-time snapshot of `dev.db` in `static/src/letters-data.json`, which is gitignored on purpose (real template/therapist data never goes into git). There is no editing in the static build — edits happen in the local full app, then `npm run deploy:static`. `static/` is excluded from the root `tsconfig.json` and has its own; `static/functions/` holds Cloudflare Pages Functions (every file there becomes a route, which is why the Basic Auth check lives in `static/lib/basicAuth.ts`).
+Until a real host (NAS) exists, the letter generator alone is deployed as a static site on Cloudflare (a Worker with static assets — not Pages; see the doc for why) — see `docs/STATIC_DEPLOY.md`. It is a small Vite app that reuses the full app's code through the same `@/` alias: `src/components/GenerateLetterForm.tsx` (the form, data-source agnostic — it receives `templates`, `therapists`, and a `generate` callback) and `src/lib/letters/generateLetter.ts` (the subject+body+signature pipeline, also used by `/api/letters/generate`). Keep letter logic in those two shared places; never fork it into `static/`. Data is a build-time snapshot of `dev.db` in `static/src/letters-data.json`, which is gitignored on purpose (real template/therapist data never goes into git). There is no editing in the static build — edits happen in the local full app, then `npm run deploy:static`. `static/` is excluded from the root `tsconfig.json` and has its own; `static/worker.ts` + `static/wrangler.jsonc` put the Basic Auth check (`static/lib/basicAuth.ts`) in front of every request; `assets.run_worker_first` must stay `true` or the asset bundle — which embeds the exported data — would be served without the password check.
 
 ### Privacy-by-minimization in the data model
 
