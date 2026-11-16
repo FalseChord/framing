@@ -21,6 +21,15 @@ export function formatSessionSlot(input: SessionSlotInput): string {
   return `${month}/${day} (${weekday}) ${input.startTime}-${endTime}`;
 }
 
+// Payment is due 24 hours after the session *starts* (confirmed with the clinic,
+// 2026-11). Same no-year, auto-weekday style as formatSessionSlot.
+export function formatPaymentDeadline(input: SessionSlotInput): string {
+  const [year, month, day] = input.date.split("-").map(Number);
+  const next = new Date(year, month - 1, day + 1);
+  const weekday = WEEKDAY_LABELS[next.getDay()];
+  return `${next.getMonth() + 1}/${next.getDate()} (${weekday}) ${input.startTime}`;
+}
+
 export function formatSessionSlots(inputs: SessionSlotInput[]): { text: string; count: number } {
   const count = inputs.length;
   if (count === 0) {

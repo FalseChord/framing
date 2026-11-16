@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatSessionSlot, formatSessionSlots } from "./dateFormat";
+import { formatPaymentDeadline, formatSessionSlot, formatSessionSlots } from "./dateFormat";
 
 describe("formatSessionSlot", () => {
   it("formats date+start time+computed end time with computed weekday, no year", () => {
@@ -43,5 +43,19 @@ describe("formatSessionSlots", () => {
 
   it("returns empty text and count 0 for no slots", () => {
     expect(formatSessionSlots([])).toEqual({ text: "", count: 0 });
+  });
+});
+
+describe("formatPaymentDeadline", () => {
+  it("is 24 hours after the session start, with the next day's weekday", () => {
+    // 2026-10-08 is a Thursday → deadline Friday 10/9 at the same start time
+    const result = formatPaymentDeadline({ date: "2026-10-08", startTime: "19:00", durationMinutes: 50 });
+    expect(result).toBe("10/9 (五) 19:00");
+  });
+
+  it("rolls over month ends", () => {
+    // 2026-10-31 is a Saturday → Sunday 11/1
+    const result = formatPaymentDeadline({ date: "2026-10-31", startTime: "10:30", durationMinutes: 50 });
+    expect(result).toBe("11/1 (日) 10:30");
   });
 });

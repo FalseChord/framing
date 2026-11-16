@@ -5,7 +5,7 @@ import flatpickr from "flatpickr";
 import { MandarinTraditional } from "flatpickr/dist/l10n/zh-tw.js";
 import "flatpickr/dist/flatpickr.min.css";
 import { buildGmailComposeUrl } from "@/lib/letters/gmailUrl";
-import { formatSessionSlot, formatSessionSlots } from "@/lib/letters/dateFormat";
+import { formatPaymentDeadline, formatSessionSlot, formatSessionSlots } from "@/lib/letters/dateFormat";
 
 export interface TemplateItem {
   id: string;
@@ -41,6 +41,7 @@ const FIELD_LABELS: Record<string, string> = {
   fee: "費用",
   eapPlanName: "EAP方案名稱",
   meetLink: "視訊連結",
+  paymentDeadline: "付款期限",
 };
 
 function pad2(n: number): string {
@@ -257,6 +258,10 @@ export default function GenerateLetterForm({
     if (selectedTemplate.requiredFields.includes("sessionDate")) {
       fields.sessionDate = sessionDateValue.date ? formatSessionSlot(sessionDateValue) : "";
     }
+    // Derived, never typed: always 24h after the session start (needs sessionDate).
+    if (selectedTemplate.requiredFields.includes("paymentDeadline")) {
+      fields.paymentDeadline = sessionDateValue.date ? formatPaymentDeadline(sessionDateValue) : "";
+    }
     if (selectedTemplate.requiredFields.includes("sessionSlots")) {
       const filledSlots = sessionSlotValues.filter((slot) => slot.date);
       const formatted = formatSessionSlots(filledSlots);
@@ -446,6 +451,10 @@ export default function GenerateLetterForm({
                 </button>
               </fieldset>
             );
+          }
+          if (fieldName === "paymentDeadline") {
+            // Computed from 日期時段 in handleGenerate — no input of its own.
+            return null;
           }
           if (fieldName === "caseRef") {
             return (
