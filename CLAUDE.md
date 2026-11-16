@@ -19,6 +19,9 @@ npx prisma migrate dev --name <name>   # create+apply a migration (dev)
 npx prisma migrate deploy              # apply migrations (prod-style, no prompts)
 npx prisma db seed                     # run prisma/seed.ts (synthetic data, idempotent upserts)
 npx prisma studio                      # browser-based DB viewer/editor, used for local data setup
+
+npm run build:static    # export dev.db → static/src/letters-data.json, then build the static letter generator into static/dist
+npm run deploy:static   # build:static + upload to Cloudflare Pages (see docs/STATIC_DEPLOY.md)
 ```
 
 ### `prisma generate` path-baking hazard — verify after every run
@@ -44,11 +47,17 @@ If a running `npm run dev` process still shows stale/wrong data after fixing the
 
 Operators are identified by picking their name from a fixed list (`/select`), not logging in. `User` has no password field. `src/middleware.ts` redirects any session-less request to `/select`, but selecting an identity performs no verification — this is a conscious tradeoff for a ≤5-person, single-machine, no-network-exposure deployment, not an oversight. Do not add credential checks back in. Session state (`userId`, `name`, `signature`) lives in an iron-session cookie set up in `src/lib/auth/session.ts`.
 
+The one exception is the interim static build (below): because it is reachable from the internet rather than only the LAN, Cloudflare checks a single clinic-wide password (HTTP Basic Auth) before serving anything. That gate sits in front of the site, not in the app — operator identity is still "pick your name," just remembered in localStorage instead of a session cookie. The V1 design (`docs/superpowers/specs/2026-10-12-practice-management-v1-design.md`) replaces all of this with real per-user passwords and roles once therapist self-service and case data arrive.
+
+### Interim static build (`static/`)
+
+Until a real host (NAS) exists, the letter generator alone is deployed as a static site on Cloudflare Pages — see `docs/STATIC_DEPLOY.md`. It is a small Vite app that reuses the full app's code through the same `@/` alias: `src/components/GenerateLetterForm.tsx` (the form, data-source agnostic — it receives `templates`, `therapists`, and a `generate` callback) and `src/lib/letters/generateLetter.ts` (the subject+body+signature pipeline, also used by `/api/letters/generate`). Keep letter logic in those two shared places; never fork it into `static/`. Data is a build-time snapshot of `dev.db` in `static/src/letters-data.json`, which is gitignored on purpose (real template/therapist data never goes into git). There is no editing in the static build — edits happen in the local full app, then `npm run deploy:static`. `static/` is excluded from the root `tsconfig.json` and has its own; `static/functions/` holds Cloudflare Pages Functions (every file there becomes a route, which is why the Basic Auth check lives in `static/lib/basicAuth.ts`).
+
 ### Privacy-by-minimization in the data model
 
 - There is no audit log of letter-generation activity. An earlier design kept one (`letters_log`: who/when/which template), but it was removed once the app's signature block started embedding the operator's code in every sent letter — Gmail's own sent-mail record plus that embedded signature already answers "who sent this," so a separate DB table was redundant. See `docs/superpowers/specs/2026-07-19-independent-template-variants-design.md` for the reasoning and the condition under which it would need reinstating (e.g. if operators ever stop sharing one Gmail account).
 - Recipient/BCC emails are entered per-generation in the UI and are **never persisted** — they exist only long enough to build a Gmail compose URL / clipboard payload.
-- The `caseRef` field on the generate page is transient (never persisted anywhere — no DB column, no log) — the operator types the case's full name once, and the UI (`CaseRefPicker` in `src/app/(app)/generate/page.tsx`) derives three selectable forms of address (`{surname}先生` / `{surname}小姐` / given name only, first character assumed to be the surname) so the rendered letter can greet the client naturally. This intentionally replaced an earlier pseudonymous-code convention (`A001`-style) once it became clear letters need to address a real client by name to read naturally — the earlier convention was never actually followed in practice for this field. It's still never written to disk.
+- The `caseRef` field on the generate page is transient (never persisted anywhere — no DB column, no log) — the operator types the case's full name once, and the UI (`CaseRefPicker` in `src/components/GenerateLetterForm.tsx`) derives three selectable forms of address (`{surname}先生` / `{surname}小姐` / given name only, first character assumed to be the surname) so the rendered letter can greet the client naturally. This intentionally replaced an earlier pseudonymous-code convention (`A001`-style) once it became clear letters need to address a real client by name to read naturally — the earlier convention was never actually followed in practice for this field. It's still never written to disk.
 - Never write real case data into this repo or into any AI prompt — all seed/test data must be synthetic.
 
 ### Letter template rendering pipeline (`src/lib/letters/`)

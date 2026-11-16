@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getSession } from "@/lib/auth/session";
-import { renderLetter, MissingFieldsError } from "@/lib/letters/render";
+import { MissingFieldsError } from "@/lib/letters/render";
 import { decodeRequiredFields } from "@/lib/letters/requiredFields";
-import { toHighlightedHtml, stripHighlightMarkers } from "@/lib/letters/highlightMarkup";
-import { buildSignatureBlock } from "@/lib/letters/signature";
+import { generateLetter } from "@/lib/letters/generateLetter";
 
 const prisma = new PrismaClient();
 
@@ -20,29 +19,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "找不到模板" }, { status: 404 });
   }
 
-  const requiredFields = decodeRequiredFields(template.requiredFields);
-
-  let renderedSubject: string;
-  let renderedBody: string;
   try {
-    renderedSubject = renderLetter({ templateBody: template.subject, requiredFields, fields, slotCount });
-    renderedBody = renderLetter({ templateBody: template.body, requiredFields, fields, slotCount });
+    const letter = generateLetter({
+      template: {
+        subject: template.subject,
+        body: template.body,
+        requiredFields: decodeRequiredFields(template.requiredFields),
+      },
+      fields,
+      slotCount,
+      includeLine: Boolean(includeLine),
+      operatorSignature: session.signature,
+    });
+    return NextResponse.json(letter);
   } catch (err) {
     if (err instanceof MissingFieldsError) {
       return NextResponse.json({ error: err.message, missingFields: err.missingFields }, { status: 400 });
     }
     throw err;
   }
-
-  const signatureBlock = buildSignatureBlock({
-    operatorSignature: session.signature,
-    includeLine: Boolean(includeLine),
-  });
-  const fullBody = `${renderedBody}\n\n${signatureBlock}`;
-
-  return NextResponse.json({
-    renderedSubject: stripHighlightMarkers(renderedSubject),
-    renderedBodyHtml: toHighlightedHtml(fullBody),
-    renderedBodyPlain: stripHighlightMarkers(fullBody),
-  });
 }

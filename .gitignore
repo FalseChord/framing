@@ -6,3 +6,6 @@ node_modules/
 *.bak
 *.tsbuildinfo
 next-env.d.ts
+static/dist/
+static/src/letters-data.json
+.wrangler/
