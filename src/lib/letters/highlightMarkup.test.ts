@@ -24,11 +24,21 @@ describe("toHighlightedHtml", () => {
     expect(toHighlightedHtml("A<B>C")).toBe('<span style="font-size:13px">A&lt;B&gt;C</span>');
   });
 
-  it("makes a highlighted span that itself contains a newline (e.g. multiple candidate slots) a block, so trailing text starts on its own line instead of running into the last bullet", () => {
+  it("puts a multi-line highlighted span (e.g. multiple candidate slots) on its own lines, so trailing text starts on its own line instead of running into the last bullet", () => {
     const result = toHighlightedHtml("時段：**◉ 7/22 (三) 19:00-19:50\n◉ 7/24 (五) 20:00-20:50**，請確認");
     expect(result).toBe(
-      '<span style="font-size:13px">時段：<b style="background-color:#fff59d;display:block;font-size:13px">◉ 7/22 (三) 19:00-19:50<br>◉ 7/24 (五) 20:00-20:50</b>，請確認</span>'
+      '<span style="font-size:13px">時段：<br><b style="background-color:#fff59d;font-size:13px">◉ 7/22 (三) 19:00-19:50<br>◉ 7/24 (五) 20:00-20:50</b><br>，請確認</span>'
     );
+  });
+
+  it("keeps multi-line highlights inline (no display:block) so the background stops at the last character", () => {
+    const result = toHighlightedHtml("時段：**◉ 7/22\n◉ 7/24**，請確認");
+    expect(result).not.toContain("display:block");
+  });
+
+  it("does not add extra line breaks where the text already has them", () => {
+    const result = toHighlightedHtml("時段：\n**◉ 7/22\n◉ 7/24**\n請確認");
+    expect(result).not.toContain("<br><br>");
   });
 
   it("does not add display:block to a single-line highlighted span (e.g. a bolded name)", () => {

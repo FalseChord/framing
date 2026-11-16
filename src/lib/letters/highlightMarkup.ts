@@ -25,14 +25,21 @@ export function toHighlightedHtml(text: string): string {
       if (index % 2 !== 1) {
         return escapeHtml(segment);
       }
-      // <b> is inline by default, so trailing text (e.g. "，是否方便...") would
-      // otherwise run onto the same line as the last bullet of a multi-slot
-      // list. display:block only for spans that are themselves multi-line
-      // (a bolded name like **王小明** stays inline, unaffected) forces
-      // trailing text onto its own line after the block, without altering
-      // the underlying text content.
-      const displayStyle = segment.includes("\n") ? "display:block;" : "";
-      return `<b style="background-color:#fff59d;${displayStyle}${NORMAL_FONT_SIZE}">${escapeHtml(segment)}</b>`;
+      const b = `<b style="background-color:#fff59d;${NORMAL_FONT_SIZE}">${escapeHtml(segment)}</b>`;
+      if (!segment.includes("\n")) {
+        return b;
+      }
+      // A multi-line span (e.g. several candidate slots, one per line) gets its
+      // own lines: a line break before it and after it, unless the surrounding
+      // text already has one. Otherwise trailing text (e.g. "，是否方便...")
+      // runs onto the last bullet's line. This used to be display:block, but a
+      // block's background fills the whole line width instead of stopping at
+      // the last character — the <b> must stay inline.
+      const before = segments[index - 1];
+      const after = segments[index + 1];
+      const breakBefore = before && !before.endsWith("\n") ? "\n" : "";
+      const breakAfter = after && !after.startsWith("\n") ? "\n" : "";
+      return `${breakBefore}${b}${breakAfter}`;
     })
     .join("");
   return `<span style="${NORMAL_FONT_SIZE}">${html.replace(/\n/g, "<br>")}</span>`;
