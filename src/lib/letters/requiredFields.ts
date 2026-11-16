@@ -1,3 +1,4 @@
+// Also used for Template.optionalFields, which shares the same JSON-array encoding.
 export function encodeRequiredFields(fields: string[]): string {
   return JSON.stringify(fields);
 }

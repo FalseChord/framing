@@ -26,6 +26,7 @@ async function main() {
       subject: t.subject,
       body: t.body,
       requiredFields: decodeRequiredFields(t.requiredFields),
+      optionalFields: decodeRequiredFields(t.optionalFields),
     })),
     therapists: therapists.map((t) => ({ id: t.id, name: t.name, email: t.email })),
     operators: users.map((u) => ({ id: u.id, name: u.name, signature: u.signature })),

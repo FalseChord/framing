@@ -9,6 +9,7 @@ interface TemplateItem {
   subject: string;
   body: string;
   requiredFields: string[];
+  optionalFields: string[];
 }
 
 interface FormState {
@@ -19,6 +20,7 @@ interface FormState {
   subject: string;
   body: string;
   requiredFieldsText: string;
+  optionalFieldsText: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -29,7 +31,15 @@ const EMPTY_FORM: FormState = {
   subject: "",
   body: "",
   requiredFieldsText: "",
+  optionalFieldsText: "",
 };
+
+function splitFieldList(text: string): string[] {
+  return text
+    .split(",")
+    .map((f) => f.trim())
+    .filter((f) => f.length > 0);
+}
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
@@ -57,6 +67,7 @@ export default function TemplatesPage() {
       subject: t.subject,
       body: t.body,
       requiredFieldsText: t.requiredFields.join(", "),
+      optionalFieldsText: t.optionalFields.join(", "),
     });
     setWarning([]);
     setError("");
@@ -85,10 +96,8 @@ export default function TemplatesPage() {
     if (!form) return;
     setError("");
 
-    const requiredFields = form.requiredFieldsText
-      .split(",")
-      .map((f) => f.trim())
-      .filter((f) => f.length > 0);
+    const requiredFields = splitFieldList(form.requiredFieldsText);
+    const optionalFields = splitFieldList(form.optionalFieldsText);
 
     const url = form.id ? `/api/templates/${form.id}` : "/api/templates";
     const method = form.id ? "PUT" : "POST";
@@ -102,6 +111,7 @@ export default function TemplatesPage() {
         subject: form.subject,
         body: form.body,
         requiredFields,
+        optionalFields,
       }),
     });
     const data = await res.json();
@@ -191,6 +201,13 @@ export default function TemplatesPage() {
             <input
               value={form.requiredFieldsText}
               onChange={(e) => setForm({ ...form, requiredFieldsText: e.target.value })}
+            />
+          </label>
+          <label>
+            其中可留空的選填欄位（用逗號分隔，必須也列在上一欄，例如：meetLink；沒填時信中留空）
+            <input
+              value={form.optionalFieldsText}
+              onChange={(e) => setForm({ ...form, optionalFieldsText: e.target.value })}
             />
           </label>
           {error && <p role="alert">{error}</p>}

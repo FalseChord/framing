@@ -13,6 +13,7 @@ export interface TemplateItem {
   variantLabel: string;
   subject: string;
   requiredFields: string[];
+  optionalFields: string[];
 }
 
 export interface TherapistItem {
@@ -457,7 +458,12 @@ export default function GenerateLetterForm({
           return (
             <label key={fieldName}>
               {FIELD_LABELS[fieldName] ?? fieldName}
-              <input value={textFields[fieldName] ?? ""} onChange={(e) => setTextField(fieldName, e.target.value)} required />
+              {selectedTemplate.optionalFields.includes(fieldName) && "（選填）"}
+              <input
+                value={textFields[fieldName] ?? ""}
+                onChange={(e) => setTextField(fieldName, e.target.value)}
+                required={!selectedTemplate.optionalFields.includes(fieldName)}
+              />
             </label>
           );
         })}

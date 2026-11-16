@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
         subject: template.subject,
         body: template.body,
         requiredFields: decodeRequiredFields(template.requiredFields),
+        optionalFields: decodeRequiredFields(template.optionalFields),
       },
       fields,
       slotCount,

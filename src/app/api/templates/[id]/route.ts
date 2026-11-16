@@ -10,6 +10,7 @@ function serializeTemplate(template: Template) {
   return {
     ...template,
     requiredFields: decodeRequiredFields(template.requiredFields),
+    optionalFields: decodeRequiredFields(template.optionalFields),
   };
 }
 
@@ -20,12 +21,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   const { id } = await params;
-  const { category, variantLabel, subject, body, requiredFields } = await request.json();
+  const { category, variantLabel, subject, body, requiredFields, optionalFields } = await request.json();
   if (!category || !subject || !body) {
     return NextResponse.json({ error: "類別、標題、內文為必填" }, { status: 400 });
   }
 
   const declaredFields: string[] = requiredFields ?? [];
+  // Only fields the template actually declares can be optional.
+  const declaredOptionalFields = ((optionalFields ?? []) as string[]).filter((f) => declaredFields.includes(f));
   const declaredVariantLabel: string = variantLabel?.trim() ? variantLabel.trim() : "不適用";
 
   let template: Template;
@@ -38,6 +41,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         subject,
         body,
         requiredFields: encodeRequiredFields(declaredFields),
+        optionalFields: encodeRequiredFields(declaredOptionalFields),
         updatedById: session.userId,
       },
     });

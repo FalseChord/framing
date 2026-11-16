@@ -35,6 +35,27 @@ describe("renderLetter", () => {
     }
   });
 
+  it("lets optional fields be blank and renders them as empty", () => {
+    const result = renderLetter({
+      templateBody: "連結：{{meetLink}}",
+      requiredFields: ["caseRef", "meetLink"],
+      optionalFields: ["meetLink"],
+      fields: { caseRef: "王先生", meetLink: "" },
+    });
+    expect(result).toBe("連結：");
+  });
+
+  it("still requires non-optional fields when some are optional", () => {
+    expect(() =>
+      renderLetter({
+        templateBody: "{{caseRef}} {{meetLink}}",
+        requiredFields: ["caseRef", "meetLink"],
+        optionalFields: ["meetLink"],
+        fields: { caseRef: "", meetLink: "" },
+      })
+    ).toThrowError(MissingFieldsError);
+  });
+
   it("resolves slot blocks using slotCount", () => {
     const result = renderLetter({
       templateBody: "[單一時段]時間為 {{sessionSlots}}[/單一時段][多個時段]候選時間：{{sessionSlots}}[/多個時段]",

@@ -1,7 +1,9 @@
 import type { TemplateItem, TherapistItem } from "@/components/GenerateLetterForm";
-import type { LetterTemplateContent } from "@/lib/letters/generateLetter";
 
-export interface StaticTemplate extends TemplateItem, LetterTemplateContent {}
+// TemplateItem plus the body — structurally a LetterTemplateContent for generateLetter().
+export interface StaticTemplate extends TemplateItem {
+  body: string;
+}
 
 export interface StaticOperator {
   id: string;

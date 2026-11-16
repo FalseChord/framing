@@ -4,6 +4,8 @@ import { resolveSlotBlocks } from "./slotBlocks";
 export interface RenderInput {
   templateBody: string;
   requiredFields: string[];
+  // Fields in requiredFields that may be left blank — skipped by the missing-field check.
+  optionalFields?: string[];
   fields: Record<string, string>;
   slotCount?: number;
 }
@@ -19,7 +21,10 @@ export class MissingFieldsError extends Error {
 }
 
 export function renderLetter(input: RenderInput): string {
-  const missing = input.requiredFields.filter((field) => !input.fields[field]?.trim());
+  const optional = input.optionalFields ?? [];
+  const missing = input.requiredFields.filter(
+    (field) => !optional.includes(field) && !input.fields[field]?.trim()
+  );
   if (missing.length > 0) {
     throw new MissingFieldsError(missing);
   }

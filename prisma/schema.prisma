@@ -34,6 +34,9 @@ model Template {
   subject        String
   body           String
   requiredFields String   @default("[]")
+  // Subset of requiredFields the form still shows but lets the operator leave
+  // blank (rendered as empty). Same JSON-array encoding as requiredFields.
+  optionalFields String   @default("[]")
   updatedAt      DateTime @updatedAt
   updatedById    String
   updatedBy      User     @relation(fields: [updatedById], references: [id])

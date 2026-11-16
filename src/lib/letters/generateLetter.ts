@@ -6,6 +6,7 @@ export interface LetterTemplateContent {
   subject: string;
   body: string;
   requiredFields: string[];
+  optionalFields?: string[];
 }
 
 export interface GenerateLetterInput {
@@ -30,12 +31,14 @@ export function generateLetter(input: GenerateLetterInput): GeneratedLetter {
   const renderedSubject = renderLetter({
     templateBody: template.subject,
     requiredFields: template.requiredFields,
+    optionalFields: template.optionalFields,
     fields,
     slotCount,
   });
   const renderedBody = renderLetter({
     templateBody: template.body,
     requiredFields: template.requiredFields,
+    optionalFields: template.optionalFields,
     fields,
     slotCount,
   });
