@@ -18,13 +18,15 @@
 
 以下指令都在專案根目錄執行。
 
+> **`pages project create` 和 `pages deploy` 一定要加 `--force`**（`pages secret`、`pages dev` 不會被轉交，也不接受這個選項）。 wrangler 4.x 新版會把 Pages 指令自動「轉交」給 Cloudflare Workers，並在偵測到 Next.js 時擅自對專案執行 OpenNext 轉換（改寫 `package.json`、`next.config.mjs`，新增 `wrangler.jsonc` 等）並嘗試部署整個完整版。`--force` 會讓它照傳統 Pages 方式執行。2026-11-16 實際踩過一次，已還原。
+
 1. 登入 Cloudflare（會開瀏覽器授權）：
    ```bash
    npx wrangler@4.162.0 login
    ```
 2. 建立 Pages 專案：
    ```bash
-   npx wrangler@4.162.0 pages project create framing-letters --production-branch main
+   npx wrangler@4.162.0 pages project create framing-letters --production-branch main --force
    ```
 3. 設定全診所共用密碼（會提示你輸入，輸入內容不會顯示）：
    ```bash

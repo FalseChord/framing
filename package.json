@@ -9,7 +9,7 @@
     "test": "vitest run",
     "export:static-data": "tsx scripts/export-static-data.ts",
     "build:static": "npm run export:static-data && tsc -p static/tsconfig.json && vite build --config static/vite.config.ts",
-    "deploy:static": "npm run build:static && cd static && npx --yes wrangler@4.162.0 pages deploy dist --project-name framing-letters --branch main"
+    "deploy:static": "npm run build:static && cd static && npx --yes wrangler@4.162.0 pages deploy dist --project-name framing-letters --branch main --force"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
