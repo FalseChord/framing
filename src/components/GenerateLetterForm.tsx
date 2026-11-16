@@ -148,8 +148,14 @@ function CaseRefPicker({ value, onChange }: { value: string; onChange: (v: strin
       <input
         value={fullName}
         onChange={(e) => setFullName(e.target.value)}
-        placeholder="輸入個案全名，例如：陳三一"
+        placeholder="例：陳三一"
+        aria-label="個案全名"
+        style={{ width: "12em", maxWidth: "100%" }}
       />
+      <span style={{ marginLeft: "8px", color: "var(--color-text-muted)", fontSize: "0.9rem" }}>
+        輸入個案全名後，選擇信中的稱呼
+      </span>
+      <br />
       {options.map((opt) => (
         <label key={opt} style={{ display: "inline-block", width: "auto", fontWeight: "normal", marginRight: "16px" }}>
           <input
