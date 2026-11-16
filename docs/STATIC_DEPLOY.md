@@ -22,7 +22,7 @@
 - `static/worker.ts`：檢查密碼，通過才交給靜態檔案。比對邏輯在 `static/lib/basicAuth.ts`（有單元測試）。
 - 網址：https://framing-letters.framing.workers.dev
 
-舊的 Pages 專案（`framing-letters.pages.dev`）在遷移期間保留，確認新版可用後再刪除。
+舊的 Pages 專案（`framing-letters.pages.dev`）已於 2026-11-16 刪除。
 
 ## 一次性設定
 
