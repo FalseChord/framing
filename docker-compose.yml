@@ -1,0 +1,20 @@
+services:
+  framing:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # The target NAS is x86 (Synology/QNAP Plus-series). Building on an
+    # Apple Silicon Mac cross-compiles via emulation; on the NAS itself
+    # this matches the host natively.
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: file:/data/prod.db
+      SESSION_SECRET: ${SESSION_SECRET}
+    volumes:
+      - framing_data:/data
+
+volumes:
+  framing_data:
