@@ -42,6 +42,7 @@ const FIELD_LABELS: Record<string, string> = {
   eapPlanName: "EAP方案名稱",
   meetLink: "視訊連結",
   paymentDeadline: "付款期限",
+  sessionNumber: "今年度第幾次（填數字）",
 };
 
 function pad2(n: number): string {
