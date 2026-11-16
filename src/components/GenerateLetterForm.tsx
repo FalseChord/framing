@@ -189,6 +189,7 @@ export default function GenerateLetterForm({
   const [caseEmail, setCaseEmail] = useState("");
   const [includeLine, setIncludeLine] = useState(false);
   const [result, setResult] = useState<{ subject: string; html: string } | null>(null);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
   const categories = Array.from(new Set(templates.map((t) => t.category))).sort();
@@ -273,9 +274,36 @@ export default function GenerateLetterForm({
       return;
     }
     setResult({ subject: outcome.subject, html: outcome.html });
+    setCopied(false);
   }
 
-  async function handleCopyAndOpenGmail() {
+  // Copying and opening Gmail are two separate clicks on purpose. They can't share
+  // one click handler: awaiting the clipboard write before window.open makes some
+  // browsers (notably Safari) treat the popup as not user-initiated, so the draft
+  // opened blank; opening the popup first moves focus to the new tab, and the
+  // clipboard API then rejects the write because this document is no longer
+  // focused — the subject/recipients arrived (they're in the URL) but the body
+  // never reached the clipboard.
+  async function handleCopy() {
+    if (!result) return;
+    setError("");
+    try {
+      // result.html (toHighlightedHtml) already carries font-size:13px on every
+      // element — Gmail's own measured "一般/Normal" size. This wrapper only adds
+      // an email-safe font-family on top; it does not need to repeat font-size.
+      // Only text/html is written: Gmail's normal paste always prefers text/html
+      // over text/plain when both are present, so a plain-text fallback entry
+      // has no effect on what actually gets pasted into the opened draft.
+      const htmlForClipboard = `<span style="font-family:Arial,sans-serif;">${result.html}</span>`;
+      const htmlBlob = new Blob([htmlForClipboard], { type: "text/html" });
+      await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob })]);
+      setCopied(true);
+    } catch {
+      setError("複製到剪貼簿失敗，請確認瀏覽器已允許本網站使用剪貼簿權限");
+    }
+  }
+
+  function handleOpenGmail() {
     if (!result) return;
 
     const missing: string[] = [];
@@ -294,27 +322,7 @@ export default function GenerateLetterForm({
       bcc: (routeToBcc ? recipientEmails : []).join(","),
       subject: result.subject,
     });
-
-    // window.open must run synchronously within the click handler — some browsers
-    // (notably Safari) only treat window.open as user-initiated if there is no
-    // `await` before it. Awaiting the clipboard write first (as this used to do)
-    // breaks that chain and causes the popup to open blank / get blocked, which is
-    // why the compose draft used to show up without the recipient/subject.
     window.open(url, "_blank");
-
-    try {
-      // result.html (toHighlightedHtml) already carries font-size:13px on every
-      // element — Gmail's own measured "一般/Normal" size. This wrapper only adds
-      // an email-safe font-family on top; it does not need to repeat font-size.
-      // Only text/html is written: Gmail's normal paste always prefers text/html
-      // over text/plain when both are present, so a plain-text fallback entry
-      // has no effect on what actually gets pasted into the opened draft.
-      const htmlForClipboard = `<span style="font-family:Arial,sans-serif;">${result.html}</span>`;
-      const htmlBlob = new Blob([htmlForClipboard], { type: "text/html" });
-      await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob })]);
-    } catch {
-      setError("複製到剪貼簿失敗，請確認瀏覽器已允許本網站使用剪貼簿權限");
-    }
   }
 
   return (
@@ -492,9 +500,15 @@ export default function GenerateLetterForm({
             {[showsTherapistEmail ? therapistEmail : "", caseEmail].filter((e) => e.trim()).join("、") || "（尚未填寫）"}
           </p>
           <div dangerouslySetInnerHTML={{ __html: result.html }} />
-          <button className="button button-primary" onClick={handleCopyAndOpenGmail}>
-            複製格式化內文並開啟 Gmail 草稿
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <button type="button" className="button button-primary" onClick={handleCopy}>
+              1. 複製格式化內文
+            </button>
+            <button type="button" className="button button-primary" onClick={handleOpenGmail}>
+              2. 開啟 Gmail 草稿
+            </button>
+            {copied && <span>✓ 內文已複製，開啟草稿後在內文處貼上即可</span>}
+          </div>
         </section>
       )}
     </main>
