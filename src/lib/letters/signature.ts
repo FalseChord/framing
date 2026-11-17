@@ -10,6 +10,7 @@ export function buildSignatureBlock(options: SignatureOptions): string {
   if (options.includeLine) {
     lines.push(LINE_CONTACT_LINE);
   }
-  lines.push("敬祝　平安順心", `加惠行政團隊 ${options.operatorSignature}`);
+  // Blank line between the closing remark(s) and 敬祝, as in the clinic's letters.
+  lines.push("", "敬祝　平安順心", `加惠行政團隊 ${options.operatorSignature}`);
   return lines.join("\n");
 }
