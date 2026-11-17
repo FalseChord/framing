@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface TherapistItem {
   id: string;
@@ -17,6 +17,7 @@ export default function TherapistsPage() {
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const formRef = useRef<HTMLFormElement>(null);
 
   async function load() {
     const res = await fetch("/api/therapists?includeInactive=true");
@@ -33,6 +34,12 @@ export default function TherapistsPage() {
     setEmail(t.email ?? "");
     setNote(t.note ?? "");
     setIsActive(t.isActive);
+    // The form sits below the whole list (~2 screens down with 20+ therapists),
+    // so without this, clicking 編輯 looked like it did nothing.
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      formRef.current?.querySelector("input")?.focus({ preventScroll: true });
+    });
   }
 
   function cancelEdit() {
@@ -79,7 +86,7 @@ export default function TherapistsPage() {
           </li>
         ))}
       </ul>
-      <form onSubmit={handleSubmit}>
+      <form ref={formRef} onSubmit={handleSubmit}>
         <h2>{editingId ? "編輯心理師" : "新增心理師"}</h2>
         <label>
           姓名
