@@ -81,4 +81,14 @@ describe("stripHighlightMarkers", () => {
     const result = toHighlightedHtml("https://meet.google.com/x?authuser=0&hs=1");
     expect(result).toContain('href="https://meet.google.com/x?authuser=0&amp;hs=1"');
   });
+
+  it("keeps leading indentation as &nbsp; so nested lists survive pasting into Gmail", () => {
+    const result = toHighlightedHtml("● 須知\n    1. 第一點\n        A. 子項");
+    expect(result).toContain("● 須知<br>&nbsp;&nbsp;&nbsp;&nbsp;1. 第一點<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A. 子項");
+  });
+
+  it("does not touch spaces in the middle of a line", () => {
+    const result = toHighlightedHtml("與 王小明 心理師");
+    expect(result).toContain("與 王小明 心理師");
+  });
 });

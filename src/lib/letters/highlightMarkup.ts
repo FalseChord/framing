@@ -56,7 +56,10 @@ export function toHighlightedHtml(text: string): string {
       return `${breakBefore}${b}${breakAfter}`;
     })
     .join("");
-  return `<span style="${NORMAL_FONT_SIZE}">${html.replace(/\n/g, "<br>")}</span>`;
+  // HTML collapses leading spaces, which flattened the indented 注意事項 lists
+  // ("    1. …", "        A. …") once pasted into Gmail. Keep them as &nbsp;.
+  const withIndent = html.replace(/(^|\n)( +)/g, (_, lineStart: string, spaces: string) => lineStart + "&nbsp;".repeat(spaces.length));
+  return `<span style="${NORMAL_FONT_SIZE}">${withIndent.replace(/\n/g, "<br>")}</span>`;
 }
 
 export function stripHighlightMarkers(text: string): string {
