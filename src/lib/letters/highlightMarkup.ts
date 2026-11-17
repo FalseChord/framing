@@ -18,14 +18,28 @@ function escapeHtml(text: string): string {
 // at the call site were not reliably honored end to end.
 const NORMAL_FONT_SIZE = "font-size:13px";
 
+// Bare links in the letter (meeting links typed into {{meetLink}}, URLs written
+// into a template) become clickable <a> tags in the copied HTML. Matches
+// http(s):// URLs plus scheme-less www. / meet.google.com/ ones, and stops at
+// whitespace or full-width punctuation so a following "，" isn't swallowed.
+const URL_PATTERN = /(?:https?:\/\/|www\.|meet\.google\.com\/)[^\s<，。、；：！？（）「」『』【】]+/g;
+
+// Runs on already-escaped text, so "&" in a URL is "&amp;" — valid in an href.
+function linkify(escapedText: string): string {
+  return escapedText.replace(URL_PATTERN, (url) => {
+    const href = /^https?:\/\//.test(url) ? url : `https://${url}`;
+    return `<a href="${href}" style="${NORMAL_FONT_SIZE}">${url}</a>`;
+  });
+}
+
 export function toHighlightedHtml(text: string): string {
   const segments = text.split(HIGHLIGHT_PATTERN);
   const html = segments
     .map((segment, index) => {
       if (index % 2 !== 1) {
-        return escapeHtml(segment);
+        return linkify(escapeHtml(segment));
       }
-      const b = `<b style="background-color:#fff59d;${NORMAL_FONT_SIZE}">${escapeHtml(segment)}</b>`;
+      const b = `<b style="background-color:#fff59d;${NORMAL_FONT_SIZE}">${linkify(escapeHtml(segment))}</b>`;
       if (!segment.includes("\n")) {
         return b;
       }

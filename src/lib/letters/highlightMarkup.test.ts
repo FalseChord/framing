@@ -61,4 +61,24 @@ describe("stripHighlightMarkers", () => {
   it("leaves text with no markers untouched", () => {
     expect(stripHighlightMarkers("沒有標記的文字")).toBe("沒有標記的文字");
   });
+
+  it("turns a full https URL into a clickable link", () => {
+    const result = toHighlightedHtml("連結：https://meet.google.com/abc-defg-hij");
+    expect(result).toContain('<a href="https://meet.google.com/abc-defg-hij" style="font-size:13px">https://meet.google.com/abc-defg-hij</a>');
+  });
+
+  it("adds https:// to a scheme-less meet link", () => {
+    const result = toHighlightedHtml("meet.google.com/abc-defg-hij");
+    expect(result).toContain('href="https://meet.google.com/abc-defg-hij"');
+  });
+
+  it("stops the link before full-width punctuation", () => {
+    const result = toHighlightedHtml("請點 https://example.com/a，謝謝");
+    expect(result).toContain('<a href="https://example.com/a" style="font-size:13px">https://example.com/a</a>，謝謝');
+  });
+
+  it("keeps query strings intact (escaped & is valid in href)", () => {
+    const result = toHighlightedHtml("https://meet.google.com/x?authuser=0&hs=1");
+    expect(result).toContain('href="https://meet.google.com/x?authuser=0&amp;hs=1"');
+  });
 });
