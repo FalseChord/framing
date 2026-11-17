@@ -240,6 +240,9 @@ export default function GenerateLetterForm({
   const [includeLine, setIncludeLine] = useState(false);
   const [result, setResult] = useState<{ subject: string; html: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  // Shown next to the copy / Gmail buttons — the form's own error line sits far
+  // above them, so a missing-email message there looked like the button did nothing.
+  const [actionError, setActionError] = useState("");
   const [error, setError] = useState("");
 
   const categories = Array.from(new Set(templates.map((t) => t.category))).sort();
@@ -329,6 +332,7 @@ export default function GenerateLetterForm({
     }
     setResult({ subject: outcome.subject, html: outcome.html });
     setCopied(false);
+    setActionError("");
   }
 
   // Copying and opening Gmail are two separate clicks on purpose. They can't share
@@ -340,7 +344,7 @@ export default function GenerateLetterForm({
   // never reached the clipboard.
   async function handleCopy() {
     if (!result) return;
-    setError("");
+    setActionError("");
     try {
       // result.html (toHighlightedHtml) already carries font-size:13px on every
       // element — Gmail's own measured "一般/Normal" size. This wrapper only adds
@@ -353,7 +357,7 @@ export default function GenerateLetterForm({
       await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob })]);
       setCopied(true);
     } catch {
-      setError("複製到剪貼簿失敗，請確認瀏覽器已允許本網站使用剪貼簿權限");
+      setActionError("複製到剪貼簿失敗，請確認瀏覽器已允許本網站使用剪貼簿權限");
     }
   }
 
@@ -364,10 +368,10 @@ export default function GenerateLetterForm({
     if (showsTherapistEmail && !therapistEmail.trim()) missing.push("心理師 Email");
     if (!caseEmail.trim()) missing.push("個案 Email");
     if (missing.length > 0) {
-      setError(`請先填寫${missing.join("、")}，才能開啟 Gmail 草稿`);
+      setActionError(`請先填寫${missing.join("、")}，才能開啟 Gmail 草稿`);
       return;
     }
-    setError("");
+    setActionError("");
 
     const recipientEmails = [showsTherapistEmail ? therapistEmail : "", caseEmail].filter((e) => e.trim());
     const routeToBcc = usesBcc(selectedTemplate?.category);
@@ -572,6 +576,7 @@ export default function GenerateLetterForm({
             </button>
             {copied && <span>✓ 內文已複製，開啟草稿後在內文處貼上即可</span>}
           </div>
+          {actionError && <p role="alert">{actionError}</p>}
         </section>
       )}
     </main>
